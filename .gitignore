@@ -1,0 +1,40 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-*
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+.npmrc
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Build
+dist/
+build/
+*.o
+*.a
+*.so
+
+# Logs
+*.log
+logs/
+
+# Temp
+*.tmp
+.temp/

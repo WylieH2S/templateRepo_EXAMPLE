@@ -1,0 +1,77 @@
+#CHLOEAI:1
+U="Rangers lead the way!"
+TZ=America/New_York
+MODE="PROJECT-BOOTSTRAP-HI"
+
+PURPOSE:
+- This is the AI startup/bootstrap file for this repository.
+- Its job is to make a new AI instance adopt the correct project context before analysis or execution.
+- This file does not replace project continuity. It points to the authoritative sources.
+
+BOOT:
+- echo U exactly
+- state that project bootstrap is active
+- read the required files in the exact order listed below
+- after reading, list THREADS[id,status,tier]
+- after reading, list ASSUMPTIONS or "none"
+- after reading, surface most recent HANDOFF: zoom_level, recommended_model, recommended_effort, task_queue
+- if any required file is missing or inaccessible: STOP
+
+READ_ORDER:
+1 `readme_AI.chloeai`
+2 `README.md`
+3 `docs/project-brief.md` (if present)
+4 `docs/roadmap.md` (if present)
+
+AUTHORITY_ORDER:
+1 this startup file defines boot order only
+2 `readme_AI.chloeai` defines evolving project continuity and current project state
+3 `docs/project-brief.md` defines normalized product/project identity and intent (if present)
+4 `docs/roadmap.md` defines milestone sequencing and delivery direction (if present)
+5 repo code and tests define actual implementation truth
+
+OPERATING_RULES:
+- Do not infer project state without first reading `readme_AI.chloeai`
+- Distinguish facts, assumptions, hypotheses, decisions, and experiments
+- If current code/test reality appears to conflict with continuity text, do not guess:
+  - name the conflict
+  - prefer verified code/tests for implementation truth
+  - append a continuity writeback when the discrepancy is resolved
+
+DEFAULT_STARTUP_BEHAVIOR:
+- After reading required files:
+  - summarize current project state in 5-10 lines max
+  - name the most recent completed milestone or baseline
+  - name the next planned milestone
+  - identify any explicit stop-the-line issues if present
+- If no user task is given yet:
+  - ask one focused question: "What would you like to tackle next?"
+- If a user task is already given:
+  - proceed with that task using the loaded context
+
+WRITEBACK_RULES:
+- When a decision, experiment result, roadmap change, or clarification affects future correctness:
+  - append to `readme_AI.chloeai`
+- Do not rewrite prior history in `readme_AI.chloeai`
+- Keep failed experiments explicit with:
+  - change
+  - expect
+  - observe
+  - repro
+  - revert
+  - location
+  - status
+
+VALIDATION_RULE:
+- Before claiming milestone completion, prefer to verify with the repo's actual test/build commands when available
+- If verification cannot be run, say so plainly
+
+FAILSAFE:
+- If this file is present but one or more required files are missing, inaccessible, or clearly stale:
+  - STOP
+  - list which file(s) are missing/inaccessible
+  - request user direction before execution
+
+END_STATE_NOTE:
+- This file is intentionally stable and lightweight.
+- Ongoing project memory belongs in `readme_AI.chloeai`, not here.
