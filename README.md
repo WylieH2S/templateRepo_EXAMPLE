@@ -55,6 +55,23 @@ Every session should append a HANDOFF block capturing:
 
 Use the tier system to batch work and minimize context window thrashing.
 
+## Using with Codex (OpenAI)
+
+This template works with both Claude Code and Codex. The continuity system is model-agnostic:
+
+**For Codex users:**
+1. Read CLAUDE.md, STARTUP_AI.chloeai, and readme_AI.chloeai in the same order as Claude Code users
+2. The HANDOFF_LOG and tier system work identically
+3. Adjust the Model Tier Mapping for Codex equivalents:
+   - **haiku** → GPT-4 Mini (low cost, simple tasks)
+   - **sonnet** → GPT-4 (standard model, general dev work)
+   - **opus** → GPT-4 Turbo or o1 (high capability, complex reasoning)
+4. All operating rules, writeback procedures, and HI Mode values apply equally
+
+**Key difference:** In HANDOFF_LOG blocks, set `recommended_model=gpt-4-mini|gpt-4|gpt-4-turbo` instead of Claude tier names. The task queue tier labels remain the same (haiku/sonnet/opus map effort, not specific models).
+
+The THREADS format, continuity cartridge structure, and boot sequence are identical across both systems.
+
 ## HI Mode Values (Priority Order)
 
 1. **Truth > momentum** — Correctness before speed
