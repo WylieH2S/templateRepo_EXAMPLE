@@ -1,0 +1,43 @@
+#CHLOEAI:1
+TYPE="glossary"
+SCOPE="project-wide"
+
+PURPOSE:
+Terminology, file-type conventions, and anti-synonyms for this project.
+Loaded every session as Tier 1. Keep entries short and precise.
+
+---
+
+FILE_TYPES:
+- .chloeai  AI-facing: memory, state, decisions, experiments, continuity.
+            Written by AI. Read by AI. The human should not need to read these.
+- .heywy    Human-facing: worksheets, test reports, Q&A input.
+            Written by the human. Read by AI every session start.
+- .md       Software/repo docs: README, CHANGELOG, roadmaps, human-facing reference.
+            Exception: CLAUDE.md and AGENTS.md are fixed names required by tooling.
+
+ANTI_SYNONYMS:
+- Do not call .chloeai files "markdown" — they use a custom CHLOEAI header format.
+- Do not call WORKSHEET.heywy a "log" — it is the human's input channel.
+- Do not call AI_HANDOFF.chloeai the "project cartridge" — readme_AI.chloeai is the cartridge.
+- Do not call ai_context/ files "documentation" — they are AI continuity state.
+
+---
+
+KEY_TERMS:
+- THREAD        A named unit of ongoing work (THR-NNN). Has status and tier.
+- HANDOFF       A session-end summary written for the next AI instance.
+- CARTRIDGE     The readme_AI.chloeai file. Source of truth for active project state.
+- TIER 1        Files loaded every session (budget-constrained, always present).
+- TIER 2        Files loaded on demand (no size cap; selective loading only).
+- STOP-THE-LINE Mandatory execution pause when a material issue is detected.
+- HI MODE       High-Integrity operating kernel. Truth > momentum.
+- TASK CONTRACT Required pre-work fill-in before any code change.
+- ZOOM LEVEL    Strategic | Tactical | Operational — scope of current session.
+- SKI LIFT      Cross-project tooling pattern worthy of standardization.
+
+---
+
+PROJECT_GLOSSARY:
+<!-- Add project-specific terms below as they are established. -->
+- (none yet)

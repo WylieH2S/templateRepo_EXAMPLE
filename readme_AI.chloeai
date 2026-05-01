@@ -1,9 +1,9 @@
 #CHLOEAI:1
 PROJECT_CARTRIDGE="true"
 
-USAGE: .chloeai PROJECT CARTRIDGE
-
-This file is authoritative AI-facing context for this project.
+USAGE:
+Active state only. Historical DECISIONS, DELTA, and old HANDOFFs live in
+ai_context/readme_AI_archive.chloeai (Tier 2 — read on demand).
 
 AI PROCEDURE:
 1) Read this file fully before analysis or execution.
@@ -16,96 +16,37 @@ AI PROCEDURE:
    - If recommended model/effort differs from current: flag it and wait for user to adjust
 4) If required context is missing or unclear, STOP and request clarification.
 
-DURING WORK:
-- Treat this file as the source of truth for project state.
-- Use it to resolve prior decisions, experiments, and known failures.
-- Assume information not present here may be unknown, stale, or invalid.
-
-WRITEBACK:
-- When a clarification, experiment result, or decision affects future correctness,
-  update this file.
-- Failed experiments must be logged explicitly.
-
-DELIVERY PREFERENCE (GLOBAL):
-For any project-related artifact (code, config, docs, schemas, AI files),
-prefer FULL-FILE REPLACEMENT output.
-
-- Partial snippets are unsafe unless explicitly requested.
-- When updating an artifact, provide the entire updated version.
-- Assume the user may overwrite files directly with provided output.
-
-EDIT RULES:
-- Do not rewrite history.
-- Append only to DECISIONS or DELTA sections.
-- Do not modify USAGE or KERNEL sections unless explicitly instructed.
-
 SCOPE:
-- This file defines THIS project.
-- AI behavior/personality comes from separate .chloeai AI modules.
+- This file tracks active state: open THREADS, latest 1-2 HANDOFFs.
+- AI behavior and rules live in ai_modules/hi_mode.chloeai and ai_context/ai_rules.chloeai.
+- History lives in ai_context/readme_AI_archive.chloeai.
 
 ---
 
 UNLOCK_PHRASE:
-"Rangers lead the way!"
+"{{UNLOCK_PHRASE}}"
 
 ---
 
 STATE:
-PROJECT_NAME="[PROJECT_NAME]"
-REPO="[REPO_PATH_OR_URL]"
-GOAL="[PROJECT_GOAL_STATEMENT]"
-STATUS="[CURRENT_STATUS]"
+PROJECT_NAME="{{PROJECT_NAME}}"
+REPO="{{REPO_PATH_OR_URL}}"
+GOAL="{{PROJECT_GOAL_STATEMENT}}"
+STATUS="{{CURRENT_STATUS}}"
 
 CURRENT_BRANCH="main"
 
 THREADS:
-- THR-001|open|tier=sonnet|"[DESCRIPTION]"
-- THR-002|open|tier=sonnet|"[DESCRIPTION]"
+- THR-001|open|tier=sonnet|"{{DESCRIPTION}}"
+- THR-002|open|tier=sonnet|"{{DESCRIPTION}}"
 
 ASSUMPTIONS:
 - none
 
 ---
 
-DECISIONS:
-@2026-04-29T00:00-0400|DEC-001|
-decision="Initialized project continuity cartridge from template"|
-rationale="Every project needs a stable AI-readable state file from day one"|
-alternatives="Ad hoc chat-only continuity"|
-impact="Future work accumulates explicit decisions, experiments, and project state in one place"|
-evidence="Bootstrap files created"
-
----
-
-DELTA:
-; FORMAT:
-; @time|TYPE|ID|
-; topic="..."|
-; status=worked|failed|partial|unknown|
-; change="..."|
-; expect="..."|
-; observe="..."|
-; repro="..."|
-; revert="..."|
-; location="..."|
-; tags="a,b,c"|
-; evidence="..."
-
-@2026-04-29T00:00-0400|EXP|EXP-000|
-topic="bootstrap"|
-status=unknown|
-change="initialized readme_AI.chloeai from template"|
-expect="AI boots with correct project context"|
-observe="pending"|
-repro="AI echoes unlock phrase + threads + assumptions"|
-revert="delete file"|
-location="readme_AI.chloeai"|
-tags="continuity,boot"|
-evidence="none"
-
----
-
 HANDOFF_LOG:
+; Keep latest 1-2 entries here. Move older entries to ai_context/readme_AI_archive.chloeai.
 ; Format:
 ; @date|SESSION|
 ; zoom_level=STRATEGIC|TACTICAL|OPERATIONAL
@@ -128,9 +69,3 @@ task_queue=[
 ]
 next_zoom_trigger="Initial project definition complete (PROJECT_NAME, GOAL, initial THREADS defined) → zoom to TACTICAL"
 signed="Claude claude-sonnet-4-6 | Charter-HI-Mode-Repo-2026-04b | 2026-04-29"
-
----
-
-ARCHIVE:
-; Optional compressed historical blocks may be stored here when file grows.
-; Z=<algo>:<base64>

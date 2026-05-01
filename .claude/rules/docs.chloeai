@@ -1,0 +1,25 @@
+#CHLOEAI:1
+TYPE="path_rules"
+GLOB="docs/**"
+
+PURPOSE:
+Rules active when touching documentation files. Loaded on demand — not every session.
+Fill in for your project. Delete sections that don't apply.
+
+---
+
+AUDIENCE:
+; Who reads these docs? Engineers, end users, stakeholders?
+; e.g., "docs/ is human-facing reference for engineers. No AI continuity content here."
+- (fill in)
+
+FORMAT_CONVENTIONS:
+; e.g., "markdown only; no HTML in doc files"
+; e.g., "all docs use sentence case headings, not title case"
+- (fill in)
+
+DOC_OWNERSHIP:
+; Which files are AI-maintained vs human-maintained?
+; e.g., "docs/roadmap.md is human-owned — AI appends but does not rewrite"
+; e.g., "docs/api-reference.md is AI-generated from source annotations"
+- (fill in)

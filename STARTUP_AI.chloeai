@@ -17,13 +17,15 @@ BOOT:
 - if any required file is missing or inaccessible: STOP
 
 READ_ORDER:
-1 `readme_AI.chloeai`              -- lean pointer cartridge (unlock phrase, file map)
-2 `ai_context/START_HERE.md`       -- full boot sequence and file map
-3 `ai_context/project_brief.md`    -- what this project IS
-4 `ai_context/CURRENT_MISSION.md`  -- active scope, stop conditions, task contract
-5 `ai_context/current_state.md`    -- current version, status, open items
-6 `WORKSHEET.heywy`                -- check for new human input
-7 `AI_HANDOFF.chloeai`             -- last 2-3 session entries
+1 `readme_AI.chloeai`                  -- active state: open threads, latest handoff
+2 `ai_context/START_HERE.md`           -- full boot sequence and file map
+3 `ai_context/ai_rules.chloeai`        -- project-wide hard constraints
+4 `ai_context/glossary.chloeai`        -- file-type conventions and terminology
+5 `ai_context/project_brief.md`        -- what this project IS
+6 `ai_context/CURRENT_MISSION.md`      -- active scope, stop conditions, task contract
+7 `ai_context/current_state.md`        -- current version, status, open items
+8 `WORKSHEET.heywy`                    -- check for new human input
+9 `AI_HANDOFF.chloeai`                 -- last 2-3 session entries
 
 AUTHORITY_ORDER:
 1 this startup file defines boot order only

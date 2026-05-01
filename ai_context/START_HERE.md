@@ -33,11 +33,15 @@ After boot: echo the unlock phrase, list THREADS, list ASSUMPTIONS, restate the 
 | File | Purpose | Update frequency |
 |------|---------|-----------------|
 | `START_HERE.md` | This index. Boot order, file map, conventions. | Rarely |
+| `ai_rules.chloeai` | Project-wide hard constraints. Tier 1. | When new project rules are established |
+| `glossary.chloeai` | File-type conventions and terminology. Tier 1. | When new terms are established |
 | `project_brief.md` | What this project is. Architecture, glossary. | Rarely |
 | `CURRENT_MISSION.md` | Mission-control layer: active priority, scope, out-of-scope, stop conditions, task contract. | Whenever focus or priority changes |
 | `technical_reference.md` | Stack rules, build/test commands, known gotchas. | When new facts are confirmed |
 | `current_state.md` | Version, status, open items, recent deltas. | Every session that changes code |
 | `decision_log.md` | Key decisions that still affect current work. | When decisions are made or superseded |
+| `decisions/` | ADR archive. Tier 2 — read on demand for architectural questions. | When architectural decisions are made |
+| `readme_AI_archive.chloeai` | Historical threads, decisions, delta, old handoffs. Tier 2. | When readme_AI.chloeai overflows |
 
 ### Repo root
 | File | Purpose | Notes |
@@ -56,6 +60,16 @@ After boot: echo the unlock phrase, list THREADS, list ASSUMPTIONS, restate the 
 | `ai_modules/hi_mode.chloeai` | High-Integrity Mode personality module. | How we work: truth>momentum, stop-the-line, no inferred intent |
 | `ai_modules/brainstorming.chloeai` | Intent capture protocol. | Triggers when project_brief.md is empty or owner asks to "plan a feature" |
 | `ai_modules/systematic_debugging.chloeai` | 4-phase root-cause protocol. | Triggers when bug reported or 2+ fix attempts have failed |
+
+### Path-scoped rules (`.claude/rules/`)
+Loaded on demand when matching paths are touched. Fill in for your project.
+
+| File | Glob | Purpose |
+|------|------|---------|
+| `.claude/rules/code.chloeai` | `src/**`, `lib/**` | Language, build, style conventions |
+| `.claude/rules/tests.chloeai` | `tests/**`, `spec/**` | Test conventions and forbidden patterns |
+| `.claude/rules/ai-context.chloeai` | `ai_context/**`, `ai_modules/**` | AI file editing rules and writeback targets |
+| `.claude/rules/docs.chloeai` | `docs/**` | Documentation format and ownership rules |
 
 ---
 

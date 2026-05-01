@@ -1,0 +1,27 @@
+#CHLOEAI:1
+TYPE="path_rules"
+GLOB="ai_context/**, ai_modules/**, readme_AI.chloeai, AI_HANDOFF.chloeai, WORKSHEET.heywy"
+
+PURPOSE:
+Rules active when editing AI context files. Loaded on demand — not every session.
+These rules protect continuity integrity.
+
+---
+
+IMMUTABLE_RULES:
+- Do not rewrite history in any .chloeai or .heywy file. Append only.
+- Do not modify USAGE or header sections of readme_AI.chloeai unless explicitly instructed.
+- Do not delete entries from AI_HANDOFF.chloeai — move to HANDOFF_ARCHIVE section if needed.
+- Do not delete entries from ai_context/decision_log.md — mark SUPERSEDED instead.
+- Closed THREADS move to ai_context/readme_AI_archive.chloeai, not deleted.
+
+WRITEBACK_TARGETS:
+- Project state changes → ai_context/current_state.md
+- Decisions made → ai_context/decision_log.md + ai_context/readme_AI_archive.chloeai DECISIONS
+- Session end → AI_HANDOFF.chloeai (append new entry)
+- Human input handled → WORKSHEET.heywy (move to HISTORY section)
+- HANDOFF overflow → move oldest from readme_AI.chloeai to ai_context/readme_AI_archive.chloeai
+
+FILE_TYPE_REMINDER:
+- .chloeai: AI-facing. Human should not need to read these.
+- .heywy: Human-facing. AI reads but does not own the content direction.
