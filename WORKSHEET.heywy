@@ -1,0 +1,81 @@
+# {{PROJECT_NAME}} -- Worksheet
+# This is YOUR file. The AI reads it every session.
+# Fill in sections, leave notes, report test results.
+# The AI will act on what you write and clear handled items.
+#
+# HOW TO USE:
+# 1. After testing or working, fill in the TEST REPORT section
+# 2. Answer any QUESTIONS below
+# 3. Drop any thoughts/ideas in NOTES
+# 4. Save the file -- the AI picks it up next session
+
+# ============================================================
+# CURRENT VERSION: v0.0.0.0 (initial scaffold)
+# Status: Project bootstrapped from baseline-template on {{TODAY}}.
+#         Fill in project brief, current mission, and first build.
+#
+# LIVE TEST FOR <next build>:
+#   Setup: <describe minimal setup>
+#   Action: <single specific action to take>
+#   Watch and report:
+#     Q1. <yes/no question>
+#     Q2. <yes/no question>
+#
+# REVERT: <how to undo the next build cleanly>
+#
+# ============================================================
+
+# ======================== OPEN ITEMS ========================
+# Tracked here for quick reference. Full details in ai_context/current_state.md.
+#
+# WAITING FOR {{OWNER_NAME}}:
+#   - (nothing yet)
+#
+# COMPLETED:
+#   - (nothing yet)
+#
+# OPEN TASKS:
+#   - (nothing yet)
+# ============================================================
+
+
+# ======================== TEST REPORT ========================
+# Fill this in after each session. Delete old reports or
+# the AI will move them to the HISTORY section for you.
+#
+# Copy this template block for each test run:
+# --------------------------------------------------
+#
+# TEST REPORT: v0.0.0.0 (YYYY-MM-DD, {{OWNER_NAME}} live test)
+# CONFIRMED WORKING:
+# - <observation>
+#
+# BUGS FOUND:
+# - <observation>
+#
+# DEFERRED:
+# - <observation>
+#
+# --------------------------------------------------
+
+
+
+# ======================= ACTIVE TEST FOCUS =======================
+# Describe what {{OWNER_NAME}} is currently exercising in real use.
+# What pass/fail signal is the next build looking for?
+
+
+
+# ======================= PARKED QUESTIONS =======================
+# Questions the AI has logged for {{OWNER_NAME}} when convenient.
+
+
+
+# ========================= NOTES =========================
+# Drop any thoughts here anytime. Ideas, complaints, vibes.
+
+
+
+
+# ======================== HISTORY ========================
+# The AI moves old test reports and answered questions here so the file stays clean.

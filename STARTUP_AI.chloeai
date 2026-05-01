@@ -1,5 +1,5 @@
 #CHLOEAI:1
-U="Rangers lead the way!"
+U="{{UNLOCK_PHRASE}}"
 TZ=America/New_York
 MODE="PROJECT-BOOTSTRAP-HI"
 
@@ -12,26 +12,29 @@ BOOT:
 - echo U exactly
 - state that project bootstrap is active
 - read the required files in the exact order listed below
-- after reading, list THREADS[id,status,tier]
+- after reading, list THREADS[id,status]
 - after reading, list ASSUMPTIONS or "none"
-- after reading, surface most recent HANDOFF: zoom_level, recommended_model, recommended_effort, task_queue
 - if any required file is missing or inaccessible: STOP
 
 READ_ORDER:
-1 `readme_AI.chloeai`
-2 `README.md`
-3 `docs/project-brief.md` (if present)
-4 `docs/roadmap.md` (if present)
+1 `readme_AI.chloeai`              -- lean pointer cartridge (unlock phrase, file map)
+2 `ai_context/START_HERE.md`       -- full boot sequence and file map
+3 `ai_context/project_brief.md`    -- what this project IS
+4 `ai_context/CURRENT_MISSION.md`  -- active scope, stop conditions, task contract
+5 `ai_context/current_state.md`    -- current version, status, open items
+6 `WORKSHEET.heywy`                -- check for new human input
+7 `AI_HANDOFF.chloeai`             -- last 2-3 session entries
 
 AUTHORITY_ORDER:
 1 this startup file defines boot order only
-2 `readme_AI.chloeai` defines evolving project continuity and current project state
-3 `docs/project-brief.md` defines normalized product/project identity and intent (if present)
-4 `docs/roadmap.md` defines milestone sequencing and delivery direction (if present)
-5 repo code and tests define actual implementation truth
+2 `ai_context/CURRENT_MISSION.md` defines active scope and stop conditions
+3 `ai_context/current_state.md` defines current version, status, and open items
+4 `ai_context/decision_log.md` defines decisions still in effect
+5 `ai_context/project_brief.md` defines normalized product/project identity and intent
+6 repo code and tests define actual implementation truth
 
 OPERATING_RULES:
-- Do not infer project state without first reading `readme_AI.chloeai`
+- Do not infer project state without first reading the ai_context package
 - Distinguish facts, assumptions, hypotheses, decisions, and experiments
 - If current code/test reality appears to conflict with continuity text, do not guess:
   - name the conflict
@@ -51,8 +54,10 @@ DEFAULT_STARTUP_BEHAVIOR:
 
 WRITEBACK_RULES:
 - When a decision, experiment result, roadmap change, or clarification affects future correctness:
-  - append to `readme_AI.chloeai`
-- Do not rewrite prior history in `readme_AI.chloeai`
+  - append a session entry to `AI_HANDOFF.chloeai`
+  - update `ai_context/current_state.md` (version, status, open items)
+  - log decisions in `ai_context/decision_log.md` if they remain in effect
+- Do not rewrite prior history; append only
 - Keep failed experiments explicit with:
   - change
   - expect
@@ -74,4 +79,4 @@ FAILSAFE:
 
 END_STATE_NOTE:
 - This file is intentionally stable and lightweight.
-- Ongoing project memory belongs in `readme_AI.chloeai`, not here.
+- Ongoing project memory belongs in the `ai_context/` package and `AI_HANDOFF.chloeai`, not here.

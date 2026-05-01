@@ -1,0 +1,120 @@
+# Task Template
+#CHLOEAI:1
+TYPE="task"
+
+# ============================================================
+# HOW TO USE THIS TEMPLATE
+# ============================================================
+#
+# Copy this template when creating a new task.
+# Fill in each section. Delete sections that don't apply.
+# Save as: TASK_<short-name>.chloeai
+#
+# Tasks live alongside the code they affect or in a tasks/ folder.
+# The AI reads these to understand what work needs doing.
+# Wy creates them. The AI executes and logs results.
+
+# ============================================================
+# TASK
+# ============================================================
+
+TASK_ID=""
+TITLE=""
+STATUS=""          # open | in-progress | blocked | done | cancelled
+PRIORITY=""        # critical | high | normal | low
+CREATED=""         # ISO 8601 timestamp
+VERSION_TARGET=""  # Which version should this land in?
+
+# ============================================================
+# DESCRIPTION
+# ============================================================
+#
+# What needs to happen? Be specific.
+# Include the "why" -- what problem does this solve?
+# Include acceptance criteria -- how do we know it's done?
+#
+# WHAT:
+#
+#
+# WHY:
+#
+#
+# DONE WHEN:
+#   - [ ]
+#   - [ ]
+#   - [ ]
+
+# ============================================================
+# CONTEXT
+# ============================================================
+#
+# What does the AI need to know before starting?
+# Link to relevant files, previous experiments, known constraints.
+#
+# RELEVANT FILES:
+#   -
+#
+# PRIOR ATTEMPTS:
+#   - (reference experiment IDs from PROJECT_STATE.chloeai if any)
+#
+# CONSTRAINTS:
+#   - (things that must NOT change, compatibility requirements, etc.)
+
+# ============================================================
+# APPROACH (AI fills this in)
+# ============================================================
+#
+# Before executing, the AI documents the planned approach here.
+# Wy reviews and approves before execution begins.
+#
+# PLAN:
+#
+#
+# ASSUMPTIONS:
+#   -
+#
+# RISKS:
+#   -
+#
+# APPROVED: [ ] yes / [ ] no (Wy checks this)
+
+# ============================================================
+# EXECUTION LOG (AI fills this in)
+# ============================================================
+#
+# Track what was actually done, step by step.
+# Use the experiment format from the personality script.
+#
+# CHANGES:
+#   @timestamp|
+#   change=""|
+#   expect=""|
+#   observe=""|
+#   location=""|
+#   status=
+
+# ============================================================
+# TESTING
+# ============================================================
+#
+# What needs to be tested? How?
+# The human fills in results in WORKSHEET.heywy after testing.
+#
+# TEST PLAN:
+#   - [ ]
+#   - [ ]
+#
+# WORKSHEET REFERENCE:
+#   (AI adds pointer to WORKSHEET.heywy test report section)
+
+# ============================================================
+# RESULT
+# ============================================================
+#
+# Final outcome. Filled in when task is done or cancelled.
+#
+# OUTCOME=""       # completed | partial | failed | cancelled
+# VERSION=""       # What version was this shipped in?
+# NOTES=""         # Anything the next session should know
+
+# END OF TASK TEMPLATE
