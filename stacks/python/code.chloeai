@@ -1,0 +1,29 @@
+#CHLOEAI:1
+TYPE="path_rules"
+GLOB="src/**, app/**, {{project_slug}}/**"
+
+LANGUAGE_RUNTIME:
+- Python 3.12+ (fill in exact version pin)
+- uv for dependency management — do not use pip install directly
+- Virtual env at .venv/ — activate before running anything
+
+BUILD:
+- No build step for pure Python (or fill in: "uv build" for packages)
+- Type check: uv run mypy src/
+- Lint + format: uv run ruff check . && uv run ruff format --check .
+
+STYLE_CONVENTIONS:
+- Ruff enforces formatting — do not hand-format
+- Type annotations required on all public functions and methods
+- snake_case for functions/variables, PascalCase for classes
+- Docstrings on public interfaces only — one line max unless complex
+- Prefer explicit imports over wildcard imports
+
+FORBIDDEN_PATTERNS:
+- No bare `except:` — always catch specific exception types
+- No `print()` in production paths — use logging module
+- No mutable default arguments (e.g., `def f(x=[])`)
+- No hardcoded secrets or environment-specific values in source
+
+EXPLICITLY_NOT_TOUCHING:
+- (fill in: generated code, migration files if hands-off, etc.)

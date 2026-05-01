@@ -1,0 +1,22 @@
+#CHLOEAI:1
+TYPE="path_rules"
+GLOB="tests/**, src/**"
+
+TEST_COMMAND:
+- cargo test
+- cargo test -- --nocapture (for output during debugging)
+- cargo test --release (for performance-sensitive tests)
+
+TEST_CONVENTIONS:
+- Unit tests in #[cfg(test)] mod tests block inside the module under test
+- Integration tests in tests/ directory (separate compilation unit)
+- Test function names: snake_case describing the behavior: test_returns_err_on_empty_input
+- Use #[should_panic(expected = "...")] for panic tests
+
+COVERAGE_REQUIREMENTS:
+- (fill in — e.g., "no hard threshold; tarpaulin for coverage reports in CI")
+
+FORBIDDEN_IN_TESTS:
+- No real network calls — use mock servers (wiremock, httpmock)
+- No real filesystem writes except via tempfile crate
+- No #[ignore] without a comment and tracking issue

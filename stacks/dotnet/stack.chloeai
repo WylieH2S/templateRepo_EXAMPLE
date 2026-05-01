@@ -1,0 +1,22 @@
+#CHLOEAI:1
+TYPE="stack_meta"
+STACK="dotnet"
+DISPLAY_NAME=".NET / C#"
+
+DESCRIPTION:
+C# services, APIs (ASP.NET Core), or desktop apps on .NET 8+.
+Minimal API or controller-based, depending on project size.
+
+RECOMMENDED_TOOLS:
+- Language:      C# 12
+- Runtime:       .NET 8 LTS
+- Build:         dotnet build / dotnet publish
+- Test:          xUnit (preferred) or NUnit / MSTest
+- Mock:          Moq or NSubstitute
+- Lint:          Roslyn analyzers + dotnet format
+- Format:        dotnet format
+
+INIT_NOTES:
+- init-project.sh copies code.chloeai → .claude/rules/code.chloeai
+- init-project.sh copies tests.chloeai → .claude/rules/tests.chloeai
+- Pin SDK version in global.json

@@ -1,0 +1,20 @@
+#CHLOEAI:1
+TYPE="stack_meta"
+STACK="ruby-rails"
+DISPLAY_NAME="Ruby / Rails"
+
+DESCRIPTION:
+Ruby on Rails web applications. API-only or full-stack with Hotwire/Turbo.
+
+RECOMMENDED_TOOLS:
+- Language:      Ruby 3.3+
+- Framework:     Rails 7.x or 8.x
+- Dependency:    Bundler (Gemfile)
+- Test:          RSpec + FactoryBot + Capybara
+- Lint:          RuboCop (rubocop-rails + rubocop-rspec)
+- Type:          Sorbet or RBS (optional but recommended)
+
+INIT_NOTES:
+- init-project.sh copies code.chloeai → .claude/rules/code.chloeai
+- init-project.sh copies tests.chloeai → .claude/rules/tests.chloeai
+- Pin Ruby version in .ruby-version

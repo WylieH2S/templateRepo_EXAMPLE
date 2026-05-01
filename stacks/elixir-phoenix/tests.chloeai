@@ -1,0 +1,23 @@
+#CHLOEAI:1
+TYPE="path_rules"
+GLOB="test/**"
+
+TEST_COMMAND:
+- mix test
+- mix test --trace for verbose output
+- mix test test/my_app/foo_test.exs for a single file
+
+TEST_CONVENTIONS:
+- ExUnit — one test module per source module: FooTest mirrors Foo
+- Use describe blocks to group related tests
+- DataCase for DB-touching tests (wraps in transaction, rolls back)
+- ConnCase for controller/LiveView tests
+- Factory: ExMachina or manual fixture functions in test/support/
+
+COVERAGE_REQUIREMENTS:
+- (fill in — e.g., "mix test --cover; no hard threshold enforced")
+
+FORBIDDEN_IN_TESTS:
+- No real external HTTP calls — use Bypass or Mox
+- No @tag :skip without a comment and tracking issue
+- No async: true on tests that share DB state

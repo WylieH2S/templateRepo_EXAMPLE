@@ -1,0 +1,21 @@
+#CHLOEAI:1
+TYPE="path_rules"
+GLOB="src/test/**"
+
+TEST_COMMAND:
+- ./gradlew test
+- ./gradlew test --info for verbose output
+
+TEST_CONVENTIONS:
+- JUnit 5 or Kotest (pick one, be consistent)
+- MockK for mocking Kotlin classes
+- Test class: FooTest, functions: `fun `descriptive test name`()`
+- Use @DisplayName for human-readable test names in JUnit 5
+
+COVERAGE_REQUIREMENTS:
+- (fill in — e.g., "JaCoCo threshold set in build.gradle.kts")
+
+FORBIDDEN_IN_TESTS:
+- No real I/O without mocking
+- No runBlocking at test root — use runTest (kotlinx-coroutines-test)
+- No @Disabled without a comment and tracking issue

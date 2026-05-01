@@ -1,0 +1,22 @@
+#CHLOEAI:1
+TYPE="stack_meta"
+STACK="rust"
+DISPLAY_NAME="Rust"
+
+DESCRIPTION:
+Systems programming, CLI tools, WebAssembly, or high-performance services
+in Rust. Stable toolchain unless nightly features are explicitly required.
+
+RECOMMENDED_TOOLS:
+- Runtime:       Rust stable toolchain (rustup)
+- Build:         cargo build
+- Linter:        clippy (cargo clippy)
+- Format:        rustfmt (cargo fmt)
+- Test:          cargo test
+- Doc:           cargo doc
+- Deny:          cargo deny (supply chain + license auditing)
+
+INIT_NOTES:
+- init-project.sh copies code.chloeai → .claude/rules/code.chloeai
+- init-project.sh copies tests.chloeai → .claude/rules/tests.chloeai
+- Pin toolchain in rust-toolchain.toml

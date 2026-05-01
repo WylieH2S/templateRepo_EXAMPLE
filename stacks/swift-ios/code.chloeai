@@ -1,0 +1,28 @@
+#CHLOEAI:1
+TYPE="path_rules"
+GLOB="Sources/**, {{ProjectName}}/**"
+
+LANGUAGE_RUNTIME:
+- Swift 5.10+ (fill in Xcode version, e.g. "Xcode 15.3")
+- Minimum deployment target: (fill in, e.g. "iOS 17.0")
+- SPM for dependencies — no CocoaPods unless legacy requirement
+
+BUILD:
+- xcodebuild -scheme {{ProjectName}} -configuration Debug build
+- swift build (if SPM-only, no Xcode)
+
+STYLE_CONVENTIONS:
+- SwiftLint rules enforced — fix warnings, do not silence without comment
+- swift-format for formatting — do not hand-format
+- Prefer SwiftUI over UIKit for new views
+- `@MainActor` on view models and UI-touching code
+- No force-unwrap (`!`) except in tests and @IBOutlet — use guard or if let
+
+FORBIDDEN_PATTERNS:
+- No force-unwrap in production code (fatalError with message is acceptable)
+- No hardcoded strings visible to users — use Localizable.strings
+- No synchronous network calls on the main thread
+- No secrets in source — use Keychain or environment config
+
+EXPLICITLY_NOT_TOUCHING:
+- (fill in: generated files, third-party vendored code, etc.)

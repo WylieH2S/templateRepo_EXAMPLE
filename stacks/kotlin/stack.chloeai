@@ -1,0 +1,21 @@
+#CHLOEAI:1
+TYPE="stack_meta"
+STACK="kotlin"
+DISPLAY_NAME="Kotlin / JVM"
+
+DESCRIPTION:
+Kotlin on the JVM — Spring Boot services, CLI tools, or Android (if
+targeting Android, add android-specific rules to PROJECT_OVERRIDES).
+
+RECOMMENDED_TOOLS:
+- Language:      Kotlin 1.9+
+- Runtime:       JVM 21 LTS
+- Build:         Gradle 8.x with Kotlin DSL (build.gradle.kts)
+- Test:          JUnit 5 + Kotest or MockK
+- Lint:          Detekt
+- Format:        ktlint
+
+INIT_NOTES:
+- init-project.sh copies code.chloeai → .claude/rules/code.chloeai
+- init-project.sh copies tests.chloeai → .claude/rules/tests.chloeai
+- For Android projects, add android rules to ai_modules/hi_mode.chloeai PROJECT_OVERRIDES

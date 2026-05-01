@@ -1,0 +1,28 @@
+#CHLOEAI:1
+TYPE="path_rules"
+GLOB="src/**"
+
+LANGUAGE_RUNTIME:
+- C# 12 / .NET 8 LTS (fill in exact SDK version in global.json)
+- Nullable reference types enabled — no #nullable disable without comment
+
+BUILD:
+- dotnet build
+- dotnet format --verify-no-changes
+- dotnet build /warnaserror for CI
+
+STYLE_CONVENTIONS:
+- dotnet format enforced — do not hand-format
+- Roslyn analyzer warnings as errors in CI (fill in ruleset)
+- Prefer records over classes for immutable data
+- Primary constructors for simple dependency injection (C# 12)
+- async/await throughout — no .Result or .Wait() blocking calls
+
+FORBIDDEN_PATTERNS:
+- No .Result or .Wait() on Tasks — always await
+- No Console.WriteLine() in production paths — use ILogger
+- No hardcoded connection strings or secrets in source
+- No suppression of nullable warnings without a comment
+
+EXPLICITLY_NOT_TOUCHING:
+- (fill in: auto-generated EF migrations in flight, scaffolded code, etc.)
