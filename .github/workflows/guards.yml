@@ -1,0 +1,75 @@
+name: Repo Guards
+
+# Cheap insurance against bloat and obvious mistakes.
+# Runs on every PR and push to main.
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  no-junk-files:
+    name: No Junk Files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Block committed .DS_Store
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)\.DS_Store$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::.DS_Store files are tracked in this repo:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "OK — no tracked .DS_Store"
+
+      - name: Block obvious secret files
+        run: |
+          pat='^(\.env$|\.env\.local$|\.env\.production$|.*\.pem$|.*\.key$|secrets/|credentials/)'
+          bad=$(git ls-files | grep -E "$pat" || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Files matching secret patterns are tracked:"
+            echo "$bad"
+            exit 1
+          fi
+          echo "OK — no tracked secret files"
+
+      - name: Block large files (>50 MB)
+        run: |
+          threshold=52428800
+          bad=$(git ls-files | while read f; do
+            [ -f "$f" ] || continue
+            size=$(wc -c < "$f")
+            if [ "$size" -gt "$threshold" ]; then
+              echo "$f ($((size / 1024 / 1024)) MB)"
+            fi
+          done)
+          if [ -n "$bad" ]; then
+            echo "::error::Files larger than 50 MB are tracked:"
+            echo "$bad"
+            echo "Use git-lfs or add to .gitignore."
+            exit 1
+          fi
+          echo "OK — no oversized files"
+
+  substrate-validation:
+    name: Substrate Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Required substrate files exist
+        run: |
+          missing=""
+          for f in CLAUDE.md readme_AI.chloeai AI_HANDOFF.chloeai .gitignore; do
+            if [ ! -f "$f" ]; then
+              missing="$missing $f"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::Missing expected substrate files:$missing"
+            # Warning, not error — allows projects to opt out.
+          fi
+          echo "OK — substrate check complete"

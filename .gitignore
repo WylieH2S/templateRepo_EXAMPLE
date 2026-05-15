@@ -1,22 +1,68 @@
+# ─────────────────────────────────────────────────────────────
+# Canonical baseline .gitignore — covers patterns common to all
+# projects. Stack-specific patterns can be appended after init.
+# ─────────────────────────────────────────────────────────────
+
 # OS
 .DS_Store
+**/.DS_Store
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# IDE
+# Editor / IDE
 .vscode/
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
 *~
 .sublime-*
+*.code-workspace
 
-# Node
+# Local Claude / AI state (per-machine, never committed)
+.claude/settings.local.json
+.aider*
+.continue/
+
+# Environment / secrets (NEVER commit)
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+.netrc
+
+# Logs
+*.log
+logs/
+
+# Temp / cache
+*.tmp
+.temp/
+.cache/
+tmp/
+
+# Generic build outputs (stack-specific overrides in stacks/)
+build/
+dist/
+out/
+*.o
+*.a
+*.so
+
+# Node baseline
 node_modules/
 npm-debug.log
 yarn-error.log
 .npmrc
 
-# Python
+# Python baseline
 __pycache__/
 *.py[cod]
 *$py.class
@@ -24,17 +70,12 @@ __pycache__/
 venv/
 env/
 
-# Build
-dist/
-build/
-*.o
-*.a
-*.so
+# Coverage / test reports
+coverage/
+.coverage
+.nyc_output/
+test-results/
 
-# Logs
-*.log
-logs/
-
-# Temp
-*.tmp
-.temp/
+# AI session ephemera (kept locally, never pushed)
+.ai-scratch/
+WORKSHEET.heywy.backup

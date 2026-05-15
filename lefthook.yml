@@ -1,0 +1,73 @@
+# lefthook.yml — pre-commit and pre-push guards.
+#
+# Install lefthook once on your machine:   brew install lefthook
+# Activate for this repo:                  lefthook install
+#
+# This config is intentionally minimal and language-agnostic.
+# Stack-specific hooks (lint, format, test) should be added by
+# the project after init-project.sh.
+
+pre-commit:
+  parallel: true
+  commands:
+    # Block .DS_Store from being committed
+    no-ds-store:
+      run: |
+        if git diff --cached --name-only | grep -E '(^|/)\.DS_Store$' > /dev/null; then
+          echo "✗ .DS_Store files in staged changes — unstage them or add to .gitignore"
+          git diff --cached --name-only | grep -E '(^|/)\.DS_Store$'
+          exit 1
+        fi
+
+    # Block large files (>10 MB) from being committed
+    no-large-files:
+      run: |
+        threshold=10485760
+        bad=$(git diff --cached --name-only | while read f; do
+          [ -f "$f" ] || continue
+          size=$(wc -c < "$f")
+          if [ "$size" -gt "$threshold" ]; then
+            echo "$f ($(($size / 1024 / 1024)) MB)"
+          fi
+        done)
+        if [ -n "$bad" ]; then
+          echo "✗ Files larger than 10 MB staged. Use git-lfs or add to .gitignore:"
+          echo "$bad"
+          exit 1
+        fi
+
+    # Block likely-secret files
+    no-secrets:
+      run: |
+        pat='\.env$|\.env\.local|\.env\.production|\.pem$|\.key$|secrets/|credentials/'
+        bad=$(git diff --cached --name-only | grep -E "$pat" || true)
+        if [ -n "$bad" ]; then
+          echo "✗ Potential secret files staged:"
+          echo "$bad"
+          echo "If these are safe to commit (e.g. .env.example), rename them. Otherwise unstage and add to .gitignore."
+          exit 1
+        fi
+
+    # Warn on direct main commits (override with --no-verify if intentional)
+    not-on-main:
+      run: |
+        branch=$(git rev-parse --abbrev-ref HEAD)
+        if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+          echo "⚠  Committing directly to $branch. Use --no-verify to override."
+          # Note: not exiting 1 — this is a warning. Change to `exit 1` to make it a hard block.
+        fi
+
+pre-push:
+  parallel: true
+  commands:
+    # Prevent force-pushes to main/master without explicit ack
+    no-force-push-main:
+      run: |
+        remote_ref="$1"
+        local_ref="$2"
+        branch=$(git rev-parse --abbrev-ref HEAD)
+        if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+          # Caller is responsible for explicit force-push intent.
+          # This hook just notes the action.
+          echo "ℹ Pushing to $branch"
+        fi
