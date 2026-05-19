@@ -17,8 +17,10 @@ BOOT:
 - if any required file is missing or inaccessible: STOP
 
 READ_ORDER:
+; THIS IS THE AUTHORITATIVE READ ORDER. START_HERE.md is a file map / conventions
+; reference, not a competing sequence. CLAUDE.md is the routing table.
 1 `readme_AI.chloeai`                  -- active state: open threads, latest handoff
-2 `ai_context/START_HERE.md`           -- full boot sequence and file map
+2 `ai_context/START_HERE.md`           -- file map and conventions
 3 `ai_context/ai_rules.chloeai`        -- project-wide hard constraints
 4 `ai_context/glossary.chloeai`        -- file-type conventions and terminology
 5 `ai_context/project_brief.md`        -- what this project IS

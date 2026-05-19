@@ -7,19 +7,27 @@
 
 ## Boot Sequence
 
-Follow this order every session:
+**You are here because `STARTUP_AI.chloeai` sent you.** `STARTUP_AI.chloeai` is the authoritative READ_ORDER source — follow what it tells you to read, in the order it tells you. This file is the file map and conventions reference, not a competing boot sequence.
 
-1. **Read this file** -- you're here, good.
-2. **Read `project_brief.md`** (this folder) -- what the project IS.
-3. **Read `CURRENT_MISSION.md`** (this folder) -- what matters RIGHT NOW, active scope, stop conditions.
-4. **Read `technical_reference.md`** (this folder) -- stack rules, build/test commands, known gotchas.
-5. **Read `current_state.md`** (this folder) -- version, status, open items, recent changes.
-6. **Read `decision_log.md`** (this folder) -- decisions still in effect.
-7. **Read `WORKSHEET.heywy`** (repo root) -- {{OWNER_NAME}}'s input channel. Check for new test reports, answered questions, or notes.
-8. **Read `AI_HANDOFF.chloeai`** (repo root) -- recent session journal entries. Skim the last 2-3 entries, not the whole file.
-9. **Read the operating charter** -- `ai_modules/hi_mode.chloeai`. It defines how we work.
+The order STARTUP_AI specifies (for context):
+1. `readme_AI.chloeai` — active state
+2. `ai_context/START_HERE.md` — this file
+3. `ai_context/ai_rules.chloeai` — hard constraints
+4. `ai_context/glossary.chloeai` — terminology
+5. `ai_context/project_brief.md` — what the project IS
+6. `ai_context/CURRENT_MISSION.md` — active scope, stop conditions
+7. `ai_context/current_state.md` — version, status, open items
+8. `WORKSHEET.heywy` — human input channel
+9. `AI_HANDOFF.chloeai` — last 2–3 session entries
 
-After boot: echo the unlock phrase, list THREADS, list ASSUMPTIONS, restate the current mission in one sentence, check for new human input, and start working.
+After boot: echo the unlock phrase, list THREADS, list ASSUMPTIONS, restate the current mission in one sentence, check for new human input.
+
+### Drift Check (mandatory before acting)
+
+Before choosing any work:
+- Run `git status` — confirm `current_state.md`'s "Current Branch" matches reality. If they disagree, the state notes are stale; surface via STOP-THE-LINE.
+- Check Tier 1 line counts against the audit in `CLAUDE.md`. If a Tier 1 file has grown >25% beyond its audited count, flag as substrate creep — log a CLAR-N and ask the user before proceeding.
+- If `current_state.md` references a milestone or branch that no longer exists, do not assume the milestone is incomplete — verify with `git log` and the actual files.
 
 **Fresh project detection:** If `project_brief.md` and `CURRENT_MISSION.md` still contain `<!-- fill in -->` or placeholder comments, this is a new project with no captured intent yet. Before choosing any work, invoke `ai_modules/brainstorming.chloeai` and run its protocol with `{{OWNER_NAME}}`. The skill defines the question discipline, design presentation, writeback targets, and the hard gate: no implementation until the captured design is approved.
 

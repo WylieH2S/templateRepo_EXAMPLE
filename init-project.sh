@@ -46,11 +46,12 @@ echo "  8)  ruby-rails     Ruby / Rails"
 echo "  9)  elixir-phoenix Elixir / Phoenix"
 echo "  10) dotnet         .NET / C#"
 echo "  11) php-laravel    PHP / Laravel"
-echo "  12) generic        No stack (fill everything in manually)"
+echo "  12) gbdk          Game Boy Development Kit (GBDK-2020)"
+echo "  13) generic        No stack (fill everything in manually)"
 echo
 
-read -r -p "Enter number [12]: " STACK_CHOICE
-STACK_CHOICE="${STACK_CHOICE:-12}"
+read -r -p "Enter number [13]: " STACK_CHOICE
+STACK_CHOICE="${STACK_CHOICE:-13}"
 
 case "$STACK_CHOICE" in
   1)  STACK="ts-node"        ; STACK_DISPLAY="TypeScript / Node.js" ;;
@@ -64,7 +65,8 @@ case "$STACK_CHOICE" in
   9)  STACK="elixir-phoenix" ; STACK_DISPLAY="Elixir / Phoenix" ;;
   10) STACK="dotnet"         ; STACK_DISPLAY=".NET / C#" ;;
   11) STACK="php-laravel"    ; STACK_DISPLAY="PHP / Laravel" ;;
-  12) STACK="generic"        ; STACK_DISPLAY="Generic (no stack)" ;;
+  12) STACK="gbdk"           ; STACK_DISPLAY="Game Boy Development Kit (GBDK-2020)" ;;
+  13) STACK="generic"        ; STACK_DISPLAY="Generic (no stack)" ;;
   *)
     echo "Invalid selection. Defaulting to generic."
     STACK="generic"
@@ -89,6 +91,34 @@ mkdir -p "$RULES_DIR"
 echo "Copying stack rules → ${RULES_DIR}/"
 cp "${STACK_DIR}/code.chloeai"  "${RULES_DIR}/code.chloeai"
 cp "${STACK_DIR}/tests.chloeai" "${RULES_DIR}/tests.chloeai"
+
+# ── Append stack metadata into technical_reference.md ────────────────────────
+STACK_META="${STACK_DIR}/stack.chloeai"
+TECH_REF="ai_context/technical_reference.md"
+
+if [[ -f "$STACK_META" && -f "$TECH_REF" ]]; then
+  echo "Wiring stack metadata into ${TECH_REF}..."
+  {
+    echo ""
+    echo "---"
+    echo ""
+    echo "## Stack Starter Pack — ${STACK_DISPLAY}"
+    echo ""
+    echo "Seeded from \`stacks/${STACK}/stack.chloeai\` at bootstrap (${TODAY})."
+    echo ""
+    # Extract DESCRIPTION and RECOMMENDED_TOOLS sections from stack.chloeai.
+    # Format is plain blocks delimited by all-caps headers ending in colon.
+    awk '
+      /^DESCRIPTION:/ { in_block=1; print "### Description"; print ""; next }
+      /^RECOMMENDED_TOOLS:/ { in_block=1; print ""; print "### Recommended Tools"; print ""; next }
+      /^INIT_NOTES:/ { in_block=0; next }
+      /^[A-Z_]+:/ { in_block=0; next }
+      in_block && /^$/ { print ""; next }
+      in_block { print }
+    ' "$STACK_META"
+    echo ""
+  } >> "$TECH_REF"
+fi
 
 # ── Substitute placeholders ───────────────────────────────────────────────────
 FILES=()
@@ -162,11 +192,14 @@ if [[ -f "$README_CHLOEAI" ]]; then
 fi
 
 # ── Scan for leftover tokens ──────────────────────────────────────────────────
+# Exclude .claude/skills/ — those files may legitimately document the
+# placeholder convention in their content. Same exclusion set as validate.sh.
 echo
 echo "Scanning for unfilled placeholder tokens..."
 LEFTOVER="$(grep -rE '\{\{[A-Z_]+\}\}' . \
   --exclude-dir=.git \
   --exclude-dir=stacks \
+  --exclude-dir=.claude \
   --exclude="init-project.sh" \
   2>/dev/null || true)"
 
@@ -189,12 +222,25 @@ echo "  Rules:    .claude/rules/code.chloeai + tests.chloeai"
 echo "  ADR-001:  ${ADR_FILE}"
 echo
 echo "Next steps:"
-echo "  1. Fill in version pins and build commands in .claude/rules/code.chloeai"
-echo "  2. Fill in ai_context/project_brief.md and ai_context/CURRENT_MISSION.md"
-echo "  3. Set your unlock phrase in readme_AI.chloeai (already substituted if you entered one)"
-echo "  4. Run: git init && git add . && git commit -m 'bootstrap: ${PROJECT_NAME} from templateRepo_EXAMPLE'"
-echo "  5. Delete stacks/ when you no longer need the other starter packs"
+echo "  1. Activate pre-commit guards:  brew install lefthook && lefthook install"
+echo "  2. Fill in version pins and build commands in .claude/rules/code.chloeai"
+echo "  3. Fill in ai_context/project_brief.md and ai_context/CURRENT_MISSION.md"
+echo "  4. Confirm ai_modules/hi_mode.chloeai EXTENDS path resolves (defaults to ~/.claude/skills/hi-mode/SKILL.md)"
+echo "  5. Run: bash .claude/skills/validate-substrate/validate.sh  (should pass with 0 failures)"
+echo "  6. git init && git add . && git commit -m 'bootstrap: ${PROJECT_NAME} from templateRepo_EXAMPLE'"
 echo
+
+# ── Stacks/ deletion prompt ───────────────────────────────────────────────────
+if [[ -d stacks ]]; then
+  read -r -p "Delete stacks/ now? Other starter packs will no longer be available. [y/N]: " STACKS_ANSWER
+  if [[ "$STACKS_ANSWER" =~ ^[yY]([eE][sS])?$ ]]; then
+    rm -rf stacks
+    echo "Deleted stacks/."
+  else
+    echo "Keeping stacks/. Delete it manually when ready."
+  fi
+  echo
+fi
 
 # ── Self-delete ───────────────────────────────────────────────────────────────
 read -r -p "Delete init-project.sh now? [y/N]: " ANSWER

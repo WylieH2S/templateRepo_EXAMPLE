@@ -21,17 +21,58 @@ fail() { echo "  ✗ $*"; FAILS=$((FAILS+1)); }
 
 section() { echo; echo "── $* ──"; }
 
+# Template mode: init-project.sh present means we're validating the template
+# itself (not a bootstrapped project). Some checks are softened in this mode
+# because placeholder tokens and unresolved EXTENDS paths are expected.
+TEMPLATE_MODE=0
+if [ -f init-project.sh ]; then
+  TEMPLATE_MODE=1
+fi
+
 echo "Validating substrate in: $(pwd)"
+[ "$TEMPLATE_MODE" -eq 1 ] && echo "(template mode — init-project.sh detected)"
 
 # ── Tier 1 required files ─────────────────────────────────────
 section "Tier 1 required files"
-for f in CLAUDE.md readme_AI.chloeai ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/START_HERE.md; do
+for f in CLAUDE.md STARTUP_AI.chloeai readme_AI.chloeai ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/START_HERE.md; do
   if [ -f "$f" ]; then
     pass "$f"
   else
     fail "$f (missing)"
   fi
 done
+
+# ── ai_modules/ required modules ──────────────────────────────
+section "ai_modules/"
+if [ -d ai_modules ]; then
+  pass "ai_modules/ directory"
+  if [ -f ai_modules/hi_mode.chloeai ]; then
+    pass "ai_modules/hi_mode.chloeai"
+  else
+    fail "ai_modules/hi_mode.chloeai (missing — HI Mode shim required)"
+  fi
+else
+  fail "ai_modules/ (missing — required for HI Mode shim)"
+fi
+
+# ── EXTENDS path resolution ───────────────────────────────────
+section "EXTENDS path resolution"
+if [ -f ai_modules/hi_mode.chloeai ]; then
+  extends_raw=$(grep -E '^EXTENDS=' ai_modules/hi_mode.chloeai | head -1 | sed -E 's/^EXTENDS="?([^"]*)"?$/\1/')
+  if [ -n "$extends_raw" ]; then
+    # Expand ~ to $HOME
+    extends_path="${extends_raw/#\~/$HOME}"
+    if [ -f "$extends_path" ]; then
+      pass "EXTENDS resolves: $extends_raw"
+    elif [ "$TEMPLATE_MODE" -eq 1 ]; then
+      warn "EXTENDS path not found: $extends_raw — expected in template (will be valid after bootstrap on target machine)"
+    else
+      fail "EXTENDS path not found: $extends_raw (expanded: $extends_path) — central charter missing or moved"
+    fi
+  else
+    warn "hi_mode.chloeai has no EXTENDS line"
+  fi
+fi
 
 # ── Path-scoped rules ─────────────────────────────────────────
 section "Path-scoped rules (.claude/rules/)"
@@ -67,8 +108,40 @@ if [ -d .git ]; then
   else
     pass "No tracked .env files"
   fi
+
+  locals=$(git ls-files 2>/dev/null | grep -cE '\.local\.json$' || true)
+  if [ "$locals" -gt 0 ]; then
+    fail "$locals tracked *.local.json files"
+  else
+    pass "No tracked *.local.json files"
+  fi
 else
   warn "Not a git repo — skipping tracked-junk check"
+fi
+
+# ── Leftover placeholder tokens ───────────────────────────────
+section "Leftover {{TOKEN}} placeholders"
+if [ "$TEMPLATE_MODE" -eq 1 ]; then
+  pass "Skipped (template mode — placeholders are expected and filled by init-project.sh)"
+else
+  # Exclude .claude/skills/ — substrate skills may legitimately document the
+  # placeholder convention in their content. Project files outside that path
+  # are real targets.
+  leftover=$(grep -rlE '\{\{[A-Z_]+\}\}' . \
+    --exclude-dir=.git \
+    --exclude-dir=stacks \
+    --exclude-dir=node_modules \
+    --exclude-dir=.claude \
+    --exclude="validate.sh" \
+    2>/dev/null || true)
+  if [ -n "$leftover" ]; then
+    count=$(echo "$leftover" | wc -l | tr -d ' ')
+    fail "$count file(s) contain unfilled {{TOKEN}} placeholders:"
+    echo "$leftover" | head -10 | sed 's/^/      /'
+    [ "$count" -gt 10 ] && echo "      ... and $((count - 10)) more"
+  else
+    pass "No leftover {{TOKEN}} placeholders"
+  fi
 fi
 
 # ── Freshness ─────────────────────────────────────────────────
@@ -91,9 +164,17 @@ section "Size sanity"
 if [ -f AI_HANDOFF.chloeai ]; then
   size=$(wc -c < AI_HANDOFF.chloeai)
   if [ "$size" -gt 204800 ]; then
-    warn "AI_HANDOFF.chloeai is $((size / 1024)) KB — consider rotating older entries to an archive"
+    warn "AI_HANDOFF.chloeai is $((size / 1024)) KB — consider rotating older entries to an archive (threshold 200 KB)"
   else
     pass "AI_HANDOFF.chloeai size OK"
+  fi
+fi
+if [ -f ai_context/current_state.md ]; then
+  size=$(wc -c < ai_context/current_state.md)
+  if [ "$size" -gt 51200 ]; then
+    warn "ai_context/current_state.md is $((size / 1024)) KB — consider rotating older deltas to readme_AI_archive.chloeai (threshold 50 KB)"
+  else
+    pass "ai_context/current_state.md size OK"
   fi
 fi
 

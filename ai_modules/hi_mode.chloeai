@@ -2,6 +2,21 @@
 TYPE="personality"
 MODULE="project_hi_mode"
 VERSION="Charter-HI-Mode-Project-2026-04c"
+
+# IMPORTANT — EXTENDS dependency:
+# The path below is the central HI Mode charter. It is machine-local and must
+# exist on every machine where this project is opened, or the shim silently
+# inherits NOTHING (no stop-the-line, no git safety, no zoom levels).
+#
+# To install the central charter:
+#   mkdir -p ~/.claude/skills/hi-mode
+#   # copy or symlink the central charter into that directory
+#
+# The validate-substrate skill checks that this path resolves. Run:
+#   bash .claude/skills/validate-substrate/validate.sh
+#
+# If the central charter lives elsewhere on your machine (e.g. inside a
+# workspace .claude/ directory), update the EXTENDS line below to that path.
 EXTENDS="~/.claude/skills/hi-mode/SKILL.md"
 SCOPE="single project"
 

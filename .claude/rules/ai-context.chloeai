@@ -1,27 +1,92 @@
 #CHLOEAI:1
 TYPE="path_rules"
-GLOB="ai_context/**, ai_modules/**, readme_AI.chloeai, AI_HANDOFF.chloeai, WORKSHEET.heywy"
+GLOB="ai_context/**, ai_modules/**, readme_AI.chloeai, AI_HANDOFF.chloeai, WORKSHEET.heywy, SIDEQUESTS.chloeai"
 
 PURPOSE:
-Rules active when editing AI context files. Loaded on demand — not every session.
-These rules protect continuity integrity.
+Rules active when editing AI continuity files. Loaded on demand when these
+paths are touched. These rules protect continuity integrity across sessions.
 
 ---
 
 IMMUTABLE_RULES:
-- Do not rewrite history in any .chloeai or .heywy file. Append only.
-- Do not modify USAGE or header sections of readme_AI.chloeai unless explicitly instructed.
-- Do not delete entries from AI_HANDOFF.chloeai — move to HANDOFF_ARCHIVE section if needed.
+- Append only. Do not rewrite history in any .chloeai or .heywy file.
+- Do not modify USAGE or STATE sections of readme_AI.chloeai unless explicitly instructed.
+- Do not delete entries from AI_HANDOFF.chloeai — move oldest to HANDOFF_ARCHIVE section if needed.
 - Do not delete entries from ai_context/decision_log.md — mark SUPERSEDED instead.
-- Closed THREADS move to ai_context/readme_AI_archive.chloeai, not deleted.
+- Do not delete DEC-NNN, EXP-NNN, or CLAR-NNN entries from readme_AI_archive.chloeai — historical record.
+- Closed THREADS move from readme_AI.chloeai THREADS to readme_AI_archive.chloeai with a closure summary line.
+
+---
+
+ENTRY_NUMBERING:
+- THR-NNN — work threads, opened sequentially in readme_AI.chloeai THREADS section
+- DEC-NNN — decisions, opened sequentially in ai_context/decision_log.md (mirrored to readme_AI_archive on finalize)
+- EXP-NNN — experiments, opened sequentially in readme_AI.chloeai RECENT_EXPERIMENTS (overflow to archive after 6 entries)
+- CLAR-NNN — clarifications/corrections, appended to readme_AI_archive.chloeai when an earlier entry needs correction (use CLAR instead of rewriting EXP/DEC/THR)
+- Never reuse a retired number. Skipped numbers stay skipped (document the skip in the next entry's body if useful).
+
+---
 
 WRITEBACK_TARGETS:
+- New THREAD or active THREAD update → readme_AI.chloeai
+- Recent experiments (last 6) → readme_AI.chloeai RECENT_EXPERIMENTS
+- Older experiments (overflow from 6) → ai_context/readme_AI_archive.chloeai EXPERIMENTS
+- Decisions made → ai_context/decision_log.md (in-effect) + ai_context/readme_AI_archive.chloeai DECISIONS (finalized)
 - Project state changes → ai_context/current_state.md
-- Decisions made → ai_context/decision_log.md + ai_context/readme_AI_archive.chloeai DECISIONS
-- Session end → AI_HANDOFF.chloeai (append new entry)
-- Human input handled → WORKSHEET.heywy (move to HISTORY section)
-- HANDOFF overflow → move oldest from readme_AI.chloeai to ai_context/readme_AI_archive.chloeai
+- Session end → AI_HANDOFF.chloeai (append new SESSION-N block)
+- Human input handled → WORKSHEET.heywy (move to HISTORY section, do not delete)
+- Cross-project parked ideas → SIDEQUESTS.chloeai (status: parked|active|shipped|dropped)
+
+---
+
+EXPERIMENT_FORMAT (RECENT_EXPERIMENTS):
+@YYYY-MM-DD|EXP-NNN|
+change="..."
+expect="..."
+observe="..."
+repro="..."         (optional; command or steps to reproduce)
+revert="..."        (how to back out if needed)
+location="..."      (files/paths affected)
+status="passed | failed | partial | reverted"
+
+THREADS_FORMAT:
+- THR-NNN|open|closed|paused|blocked|tier=haiku|sonnet|opus|"short description"
+- Order by ID. New threads append at bottom.
+- Status changes are edits in place (not appends).
+
+DECISION_FORMAT (decision_log.md):
+@YYYY-MM-DD|DEC-NNN|"short title"
+rationale="..."
+impact="..."
+status="active | superseded by DEC-MMM"
+
+CLARIFICATION_FORMAT (readme_AI_archive.chloeai):
+@YYYY-MM-DD|CLAR-NNN|corrects=EXP-NNN|DEC-NNN|THR-NNN
+issue="what was wrong or unclear"
+correction="what is actually true"
+evidence="how we know"
+
+---
+
+SIDEQUESTS_USAGE:
+SIDEQUESTS.chloeai is for ideas that came up during work but don't belong to the current project's THREADS. Each entry has a status:
+- parked   — captured, no decision yet
+- active   — being explored in parallel (rare; usually means it should be a THR)
+- shipped  — promoted to a real project or merged elsewhere
+- dropped  — explicitly decided against (include one-line reason)
+
+Promote a sidequest to a THR when it has a concrete owner, scope, and acceptance criteria. Drop a sidequest when it conflicts with project direction or duplicates existing work — never silently delete.
+
+---
 
 FILE_TYPE_REMINDER:
-- .chloeai: AI-facing. Human should not need to read these.
-- .heywy: Human-facing. AI reads but does not own the content direction.
+- .chloeai — AI-facing. Human should not need to read these. Exception: readme_AI.chloeai is the project cartridge.
+- .heywy — Human-facing. AI reads but does not own direction. WORKSHEET.heywy is the human input channel.
+
+---
+
+NON_NEGOTIABLES:
+- Continuity files are the source of truth for what's been tried, decided, and built.
+  Do not act on assumptions when continuity files have the answer — read them first.
+- If a continuity entry shows a closed or SUPERSEDED decision, do not silently reopen it.
+  Surface the conflict via STOP-THE-LINE before re-attempting.

@@ -32,13 +32,13 @@ STATE:
 PROJECT_NAME="{{PROJECT_NAME}}"
 REPO="{{REPO_PATH_OR_URL}}"
 GOAL="{{PROJECT_GOAL_STATEMENT}}"
-STATUS="{{CURRENT_STATUS}}"
+STATUS="Bootstrapped {{TODAY}} — awaiting first real work"
 
 CURRENT_BRANCH="main"
 
 THREADS:
-- THR-001|open|tier=sonnet|"{{DESCRIPTION}}"
-- THR-002|open|tier=sonnet|"{{DESCRIPTION}}"
+- THR-001|open|tier=sonnet|"Define project goal, scope, and success criteria"
+- THR-002|open|tier=sonnet|"Define initial work threads and acceptance criteria"
 
 ASSUMPTIONS:
 - none

@@ -66,8 +66,8 @@ SCOPE="single project"
 #     scenario that fails before the fix and passes after)
 #   - Make the smallest change consistent with the root cause
 #   - Verify the fix works (run the test, run the live-test scenario)
-#   - Log the result via the experiment format from
-#     TEMPLATE_personality.chloeai (change/expect/observe/repro/revert)
+#   - Log the result via the EXPERIMENT_LOG_FORMAT defined in
+#     ai_context/ai_rules.chloeai (change/expect/observe/repro/revert/location/status)
 #
 # Architecture stop:
 #   If 3+ fixes have failed against the same symptom, STOP patching.
