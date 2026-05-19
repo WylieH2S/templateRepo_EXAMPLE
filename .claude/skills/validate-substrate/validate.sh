@@ -124,16 +124,9 @@ section "Leftover {{TOKEN}} placeholders"
 if [ "$TEMPLATE_MODE" -eq 1 ]; then
   pass "Skipped (template mode — placeholders are expected and filled by init-project.sh)"
 else
-  # Exclude .claude/skills/ — substrate skills may legitimately document the
-  # placeholder convention in their content. Project files outside that path
-  # are real targets.
-  leftover=$(grep -rlE '\{\{[A-Z_]+\}\}' . \
-    --exclude-dir=.git \
-    --exclude-dir=stacks \
-    --exclude-dir=node_modules \
-    --exclude-dir=.claude \
-    --exclude="validate.sh" \
-    2>/dev/null || true)
+  # Scan only git-tracked files so vendor dirs, generated caches, and
+  # untracked local files don't produce false positives.
+  leftover=$(git ls-files 2>/dev/null | xargs grep -lE '\{\{[A-Z_]+\}\}' 2>/dev/null || true)
   if [ -n "$leftover" ]; then
     count=$(echo "$leftover" | wc -l | tr -d ' ')
     fail "$count file(s) contain unfilled {{TOKEN}} placeholders:"
