@@ -190,9 +190,12 @@ while IFS= read -r f; do
     if echo "$sym" | grep -qE "$ORPHAN_EXPORT_ALLOWLIST"; then continue; fi
 
     # Count references outside the defining file.
+    # Strip comment-only lines first so stale documentation references
+    # (e.g. "// commandMoveTo (broken for bot-only teams)" in config.ts)
+    # don't count as live usage. Common comment leaders: //, #, *, /*.
     # Use the bulk concatenated text minus this file's lines for speed.
-    self_count=$(grep -cE "\\b${sym}\\b" "$f" 2>/dev/null || true)
-    total_count=$(grep -cE "\\b${sym}\\b" "$bulk_text" 2>/dev/null || true)
+    self_count=$(grep -vE '^[[:space:]]*(//|#|\*|/\*)' "$f" 2>/dev/null | grep -cE "\\b${sym}\\b" || true)
+    total_count=$(grep -vE '^[[:space:]]*(//|#|\*|/\*)' "$bulk_text" 2>/dev/null | grep -cE "\\b${sym}\\b" || true)
     external=$((total_count - self_count))
 
     if [ "$external" -le 0 ]; then
