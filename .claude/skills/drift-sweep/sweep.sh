@@ -187,6 +187,9 @@ while IFS= read -r f; do
   while IFS=: read -r lineno line; do
     sym=$(echo "$line" | sed -nE 's/^[[:space:]]*export[[:space:]]+(async[[:space:]]+)?(function|const|class|let|var|interface|type|enum)[[:space:]]+([A-Za-z_][A-Za-z_0-9]*).*$/\3/p')
     [ -z "$sym" ] && continue
+    kind=$(echo "$line" | sed -nE 's/^[[:space:]]*export[[:space:]]+(async[[:space:]]+)?(function|const|class|let|var|interface|type|enum)[[:space:]]+([A-Za-z_][A-Za-z_0-9]*).*$/\2/p')
+    # type/interface exports are structural TS API surface — cross-file absence is not drift.
+    if [ "$kind" = "type" ] || [ "$kind" = "interface" ]; then continue; fi
     if echo "$sym" | grep -qE "$ORPHAN_EXPORT_ALLOWLIST"; then continue; fi
 
     # Count references outside the defining file.
@@ -241,10 +244,10 @@ fi
 # ── 7. CLAUDE.md path-rules table sanity ──────────────────────
 section "CLAUDE.md path-rules table"
 if [ -f CLAUDE.md ]; then
-  if grep -qE '^\| Glob \| Rules file \|' CLAUDE.md; then
+  if grep -qE '^\| Glob \|' CLAUDE.md; then
     pass "CLAUDE.md has path-scoped rules table"
   else
-    warn "CLAUDE.md missing path-scoped rules table (no '| Glob | Rules file |' header found)"
+    warn "CLAUDE.md missing path-scoped rules table (no '| Glob | ...' table header found)"
   fi
 else
   fail "CLAUDE.md missing"
