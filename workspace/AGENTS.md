@@ -6,11 +6,11 @@ This is the **parent workspace** for all WORKSPACE_OWNER projects. This folder i
 
 ## Boot sequence (read in order)
 
-1. **Operating charter:** `.claude/skills/hi-mode/SKILL.md` — read the latest `@date|SESSION-N|` HANDOFF block at the bottom. That is the current zoom level, recommended model/effort, task queue, and context.
+1. **Operating charter (if present):** `.claude/skills/hi-mode/SKILL.md` — read the latest `@date|SESSION-N|` HANDOFF block for current zoom level, recommended model/effort, task queue, and context. See `SETUP.md` step 3 for setup.
 2. **Repo roster:** `ROSTER.md` — lifecycle status of every repo (ACTIVE / DORMANT / BLOCKED / NEW / HELD / TEMPLATE / MAINTAINED).
 3. **Inbox:** `.repo-manager/inbox.md` — between-session notes from prior sessions.
 4. **Drift findings:** `.repo-manager/drift_log.chloeai` — fleet drift state and OPEN DUE-OUTS ledger. Read when investigating drift or after a sweep.
-5. **Tooling intelligence:** `.claude/skills/hi-mode/ski_lift_log.chloeai` — read at STRATEGIC zoom; skip at OPERATIONAL.
+5. **Tooling intelligence (if present):** `.claude/skills/hi-mode/ski_lift_log.chloeai` — read at STRATEGIC zoom; skip at OPERATIONAL.
 
 ## When working on a specific repo
 

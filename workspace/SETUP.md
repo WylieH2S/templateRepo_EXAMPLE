@@ -68,11 +68,23 @@ cp -r .claude/skills/drift-sweep "$WORKSPACE/.claude/skills/"
 cp -r .claude/skills/validate-substrate "$WORKSPACE/.claude/skills/"
 ```
 
-**3. Link HI Mode into your user Claude Code config (optional — needed for /hi-mode slash command):**
+**3. (Optional) Set up your operating charter:**
+
+`.claude/skills/hi-mode/` is where your **operating charter** lives — a persistent cross-session kernel that tracks zoom level, recommended model/effort, task queue, and context across AI sessions. It is not bundled in the template; you write your own.
+
 ```bash
-mkdir -p ~/.claude/skills
+mkdir -p "$WORKSPACE/.claude/skills/hi-mode"
+# Create SKILL.md here — your operating charter.
+# Define: who you are, your values, a boot sequence, and a HANDOFF LOG section.
+# The boot sequences in CLAUDE.md and AGENTS.md will gracefully skip if absent.
+```
+
+To make it available as a Claude Code slash command:
+```bash
 ln -s "$WORKSPACE/.claude/skills/hi-mode" ~/.claude/skills/hi-mode
 ```
+
+**Skip this step if you're getting started** — the workspace and per-repo tools work without it.
 
 **4. For each project repo, symlink the workspace canonical skills:**
 ```bash

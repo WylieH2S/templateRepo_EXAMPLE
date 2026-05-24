@@ -10,12 +10,12 @@ Each subdirectory is its own git repo with its own substrate. This parent holds 
 
 ## Boot sequence for AI (read in order)
 
-1. **HI Mode charter:** `.claude/skills/hi-mode/SKILL.md` — read the latest `SESSION-N` HANDOFF block at the bottom. That's the current zoom, model, task queue, and context.
+1. **Operating charter (if present):** `.claude/skills/hi-mode/SKILL.md` — read the latest `SESSION-N` HANDOFF block at the bottom for current zoom, model, task queue, and context. See `SETUP.md` step 3 for setup.
 2. **ROSTER:** `ROSTER.md` — lifecycle status of every repo (ACTIVE / DORMANT / BLOCKED / NEW / HELD / TEMPLATE / MAINTAINED).
 3. **Most recent audit:** `.repo-manager/audits/` (latest by date) — historical markdown audits. Going forward, fleet drift findings live in `drift_log.chloeai` (see step 5).
 4. **Inbox:** `.repo-manager/inbox.md` — between-session notes from prior sessions.
 5. **Drift findings journal:** `.repo-manager/drift_log.chloeai` — fleet code/substrate drift state. Read when investigating drift or after a cross-repo sweep.
-6. **Cross-cutting tooling intelligence:** `.claude/skills/hi-mode/ski_lift_log.chloeai` — read at STRATEGIC zoom; skip at OPERATIONAL.
+6. **Cross-cutting tooling intelligence (if present):** `.claude/skills/hi-mode/ski_lift_log.chloeai` — read at STRATEGIC zoom; skip at OPERATIONAL.
 
 **Workspace skills** (callable from any repo subdirectory):
 - `.claude/skills/validate-substrate/` — structural substrate compliance check
