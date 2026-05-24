@@ -12,7 +12,7 @@ TYPE="task"
 #
 # Tasks live alongside the code they affect or in a tasks/ folder.
 # The AI reads these to understand what work needs doing.
-# Wy creates them. The AI executes and logs results.
+# The human creates them. The AI executes and logs results.
 
 # ============================================================
 # TASK
@@ -65,7 +65,7 @@ VERSION_TARGET=""  # Which version should this land in?
 # ============================================================
 #
 # Before executing, the AI documents the planned approach here.
-# Wy reviews and approves before execution begins.
+# The human reviews and approves before execution begins.
 #
 # PLAN:
 #

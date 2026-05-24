@@ -21,7 +21,7 @@ echo
 
 read -r -p "Project name (no spaces, e.g. MyProject): " PROJECT_NAME
 read -r -p "Project blurb (one sentence): " PROJECT_BLURB
-read -r -p "Owner name (e.g. Wy): " OWNER_NAME
+read -r -p "Owner name (e.g. Alice): " OWNER_NAME
 read -r -p "Repo URL or path (e.g. github.com/user/repo): " REPO_PATH
 read -r -p "Unlock phrase [Rangers lead the way!]: " UNLOCK_PHRASE
 UNLOCK_PHRASE="${UNLOCK_PHRASE:-Rangers lead the way!}"

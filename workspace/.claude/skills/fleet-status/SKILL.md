@@ -34,7 +34,7 @@ Walks every git repo in the workspace root, finds the latest `@DATE|SESSION|` HA
 ```
 [MyProject]  2026-05-24 | SESSION-001
   zoom=TACTICAL  model=sonnet  effort=medium
-  reason: Wy live-tested the care feedback build...
+  reason: Owner reviewed and tested the latest build...
   • [sonnet] Choose the next core-mechanics slice from main
   • [sonnet] Decide whether to push main and/or create a follow-up tag
   signed: Codex GPT-5 | Charter-HI-Mode-Repo-2026-04d | 2026-05-21
