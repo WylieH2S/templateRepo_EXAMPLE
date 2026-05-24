@@ -72,6 +72,7 @@ mkdir -p "$WORKSPACE/.claude/skills"
 cp -r .claude/skills/drift-sweep "$WORKSPACE/.claude/skills/"
 cp -r .claude/skills/validate-substrate "$WORKSPACE/.claude/skills/"
 cp -r workspace/.claude/skills/hi-mode "$WORKSPACE/.claude/skills/"
+cp -r workspace/.claude/skills/fleet-status "$WORKSPACE/.claude/skills/"
 ```
 
 **3. Customize your operating charter:**
@@ -82,9 +83,10 @@ A starter charter is pre-seeded at `.claude/skills/hi-mode/SKILL.md`. Open it an
 - `UNLOCK_PHRASE` — a phrase the AI echoes to confirm it has read the rules
 - Delete the `CHANGEME` section when done
 
-To make the charter available as a Claude Code slash command:
+To make the charter and fleet-status available as Claude Code slash commands:
 ```bash
 ln -s "$WORKSPACE/.claude/skills/hi-mode" ~/.claude/skills/hi-mode
+ln -s "$WORKSPACE/.claude/skills/fleet-status" ~/.claude/skills/fleet-status
 ```
 
 **Skip the slash command link if you don't use Claude Code** — the workspace CLAUDE.md and AGENTS.md boot sequences work with any AI that can read files.
@@ -120,3 +122,5 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet
 | `.repo-manager/drift_log.ai` | Fleet drift findings journal (starts empty) |
 | `.claude/skills/hi-mode/SKILL.md` | Starter operating charter (customize with your AI name + unlock phrase) |
 | `.claude/skills/hi-mode/ski_lift_log.ai` | Tooling adoption candidates log (starts empty) |
+| `.claude/skills/fleet-status/fleet-status.sh` | Fleet status script — surfaces latest HANDOFF from every repo |
+| `.claude/skills/fleet-status/SKILL.md` | `/fleet-status` slash command definition |

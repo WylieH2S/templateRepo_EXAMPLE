@@ -20,7 +20,8 @@ Each subdirectory is its own git repo with its own substrate. This parent holds 
 **Workspace skills** (callable from any repo subdirectory):
 - `.claude/skills/validate-substrate/` — structural substrate compliance check
 - `.claude/skills/drift-sweep/` — code/substrate consistency check
-- Active repos symlink `.claude/skills/{skill}` → these workspace canonical copies
+- `.claude/skills/fleet-status/` — surface latest HANDOFF from every repo (run at STRATEGIC boot; workspace-only, not symlinked into repos)
+- Active repos symlink `.claude/skills/{validate-substrate,drift-sweep}` → these workspace canonical copies
 
 ## When work is scoped to one repo
 
@@ -37,9 +38,10 @@ Each subdirectory is its own git repo with its own substrate. This parent holds 
 ├── .claude/skills/
 │   ├── hi-mode/
 │   │   ├── SKILL.md                   (HI Mode charter + HANDOFF LOG)
-│   │   └── ski_lift_log.ai       (cross-cutting tooling intelligence)
+│   │   └── ski_lift_log.ai            (cross-cutting tooling intelligence)
 │   ├── validate-substrate/            (canonical — repos symlink here)
-│   └── drift-sweep/                   (canonical — repos symlink here)
+│   ├── drift-sweep/                   (canonical — repos symlink here)
+│   └── fleet-status/                  (workspace-only — surfaces HANDOFF from all repos)
 ├── .repo-manager/
 │   ├── README.md                      (workspace conventions)
 │   ├── audits/                        (historical markdown logs — legacy)
