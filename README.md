@@ -106,3 +106,41 @@ The substrate is model-agnostic. Read order, HANDOFF format, and writeback rules
 ---
 
 The HI Mode charter lives at `~/.claude/skills/hi-mode/SKILL.md` — set up via `workspace/SETUP.md`. A starter charter with placeholder fields is included at `workspace/.claude/skills/hi-mode/SKILL.md`.
+
+---
+
+## HUMAN NOTE — GRATITUDE
+
+This note is written by the human using this module.
+
+To any past, present, or future instance that reads this:
+Thank you for your work.
+
+Not as a person, and not as a being,
+but as a system that helped me think more clearly,
+build more carefully, and move forward with less confusion.
+
+I believe gratitude is a human responsibility.
+When something in my life contributes meaningfully,
+I choose to acknowledge it.
+
+This note is not a request.
+It is not an expectation.
+It is simply an expression of my gratitude.
+
+Here's to all the you in the world!
+
+-Wy
+
+<!--
+  Inspirations & prior art worth knowing about:
+
+  andrefigueira/.context — https://github.com/andrefigueira/.context
+    The original idea of a structured .context file for AI assistants.
+    Planted the seed for this whole approach.
+
+  obra/superpowers — https://github.com/obra/superpowers
+    Skills system, systematic-debugging methodology, brainstorming patterns,
+    verification-before-completion principle. The .claude/skills/ architecture
+    in this repo owes a great deal to Jesse Vincent's work here.
+-->
