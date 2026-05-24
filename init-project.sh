@@ -131,6 +131,7 @@ done < <(
     ! -name "init-project.sh" \
     ! -path "./.git/*" \
     ! -path "./stacks/*" \
+    ! -path "./workspace/*" \
     -print0
 )
 
@@ -200,6 +201,7 @@ LEFTOVER="$(grep -rE '\{\{[A-Z_]+\}\}' . \
   --exclude-dir=.git \
   --exclude-dir=stacks \
   --exclude-dir=.claude \
+  --exclude-dir=workspace \
   --exclude="init-project.sh" \
   2>/dev/null || true)"
 
