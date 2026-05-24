@@ -14,7 +14,31 @@ Detects **code/substrate consistency drift** in a repo. Companion to `validate-s
 
 The recurring pattern this skill exists to catch: a probe / iteration cycle adds defensive code while surrounding modules go unmaintained — config constants, helper functions, and state fields from stripped subsystems accumulate as dead exports; file-header comments grow into version-history journals; `CURRENT_MISSION.md` describes the system one way while the code does another; uncommitted state accumulates across multiple iterations until a single mistake erases all of it.
 
-## Checks (v0.1.2)
+## Flags
+
+```bash
+bash sweep.sh [--quiet] [--json] [--fail-on=<categories>] [<repo-path>]
+```
+
+| Flag | Effect |
+|------|--------|
+| `--quiet` | Suppress PASS lines; show only WARN and FAIL |
+| `--json` | Emit JSON to stdout (suppresses human-readable output) |
+| `--fail-on=<cats>` | Comma-separated list of categories that affect exit code; all categories still run and report |
+
+**Categories for `--fail-on`:** `working-tree`, `untracked-docs`, `cruft`, `file-journals`, `orphans`, `mission-freshness`, `claude-md`
+
+**Pre-commit use case** — run drift-sweep in lefthook without blocking on orphans (which need manual triage):
+```bash
+bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals
+```
+
+**CI/automation use case** — parseable output:
+```bash
+bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-journals | jq '.exit_failures'
+```
+
+## Checks (v0.1.3)
 
 1. **Working-tree health** — total uncommitted insertions+deletions (FAIL if > `DIFF_FAIL_THRESHOLD`, default 1000); dirty file count (WARN if > `DIRTY_FILES_WARN`, default 10); count of `+// vX.Y.Z` comment lines added in a single file's diff (FAIL if > `JOURNAL_DIFF_LINES_FAIL`, default 3).
 2. **Untracked important docs** — any file under `git ls-files --others --exclude-standard` whose name contains `audit`/`findings`/`mission`/`handoff`/`decisions`/`charter`/`rules` and ends in `.md` or `.chloeai`. These should never be untracked.
@@ -70,11 +94,12 @@ Exit code: 0 if no failures, 1 if any FAIL, 2 if cannot enter target repo.
 - **Before each commit** during iterative / probe work (via lefthook pre-commit, ideally)
 - **At session start** when working tree is dirty
 - **After a probe iteration's live test** lands a result — confirms the result was committed and no defensive code was left behind
-- **As part of periodic cross-repo audits** (run with `--json` flag once available in v1.0 for pipeable output)
+- **As part of periodic cross-repo audits** (use `--json` for pipeable output; `--fail-on=working-tree,untracked-docs,file-journals` for a quick no-triage pre-commit gate)
 
 ## Versions
 
-- **v0.1.2 (current)** — DO-016: skip `type`/`interface` exports in orphan check (structural TS API surface, not runtime drift). DO-017: CLAUDE.md path-rules table regex accepts any column count after `Glob` (2-col or 3-col format).
+- **v0.1.3 (current)** — DO-007: `--quiet`, `--json`, and `--fail-on=<categories>` flags. `--fail-on` enables selective pre-commit gating without blocking on orphans or freshness.
+- **v0.1.2** — DO-016: skip `type`/`interface` exports in orphan check (structural TS API surface, not runtime drift). DO-017: CLAUDE.md path-rules table regex accepts any column count after `Glob` (2-col or 3-col format).
 - **v0.1.1** — orphan check strips comment-leader lines before counting refs, eliminating false positives from stale inline comments.
 - **v0.1** — initial implementation; check categories above.
-- **v1.0 (planned)** — `--json` output, `--quiet` mode, `--fail-on=<categories>` flag for pre-commit subset, template-mode self-test, comment-claim mismatch with sane heuristics.
+- **v1.0 (planned)** — class-method orphan detection (currently only top-level exports are checked; dead class methods are invisible to the script), template-mode self-test, comment-claim mismatch with sane heuristics.

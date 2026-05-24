@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
-# drift-sweep — detect code/substrate drift in a repo.
+# drift-sweep v0.1.3 — detect code/substrate drift in a repo.
 #
-# Usage: bash sweep.sh [<repo-path>]   (default: current dir)
+# Usage: bash sweep.sh [flags] [<repo-path>]   (default: current dir)
+#
+# Flags:
+#   --quiet                  Suppress PASS lines; show only WARN and FAIL.
+#   --json                   Emit JSON to stdout instead of human-readable output.
+#   --fail-on=<categories>   Comma-separated list of categories that count toward
+#                            the exit code. All categories still run and report.
+#                            If omitted, all failures count. Categories:
+#                              working-tree, untracked-docs, cruft, file-journals,
+#                              orphans, mission-freshness, claude-md
 #
 # Companion to validate-substrate. validate-substrate checks STRUCTURAL substrate
 # compliance (Tier 1 files exist, size thresholds, tracked junk). drift-sweep
@@ -21,14 +30,29 @@
 #   SOURCE_EXTENSIONS         — file extensions to treat as source (default "ts tsx js py rs go swift")
 #
 # Exit codes:
-#   0 = no failures (warnings allowed)
-#   1 = one or more FAIL checks
+#   0 = no failures (warnings allowed) [or no failures in --fail-on categories]
+#   1 = one or more FAIL checks [in --fail-on categories]
 #   2 = cannot enter repo
 
 set -uo pipefail
 
-REPO="${1:-.}"
-cd "$REPO" || { echo "Cannot enter $REPO"; exit 2; }
+# ── Arg parsing ───────────────────────────────────────────────
+REPO="."
+JSON_OUTPUT=0
+QUIET_OUTPUT=0
+FAIL_ON_CATEGORIES=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --json) JSON_OUTPUT=1; shift ;;
+    --quiet) QUIET_OUTPUT=1; shift ;;
+    --fail-on=*) FAIL_ON_CATEGORIES="${1#--fail-on=}"; shift ;;
+    -*) echo "Unknown flag: $1" >&2; exit 1 ;;
+    *) REPO="$1"; shift ;;
+  esac
+done
+
+cd "$REPO" || { echo "Cannot enter $REPO" >&2; exit 2; }
 
 # ── Defaults + optional config ────────────────────────────────
 CONFIG=".claude/drift-sweep.conf"
@@ -47,14 +71,58 @@ SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
 
 FAILS=0
 WARNS=0
+EXIT_FAILS=0
+CURRENT_CATEGORY=""
+declare -a JSON_CHECKS
+JSON_CHECKS=()
 
-pass() { echo "  ✓ $*"; }
-warn() { echo "  ⚠ $*"; WARNS=$((WARNS+1)); }
-fail() { echo "  ✗ $*"; FAILS=$((FAILS+1)); }
-section() { echo; echo "── $* ──"; }
+# Returns 0 (true) if failures in this category count toward the exit code.
+should_fail_on() {
+  [ -z "$FAIL_ON_CATEGORIES" ] && return 0
+  echo "$FAIL_ON_CATEGORIES" | tr ',' '\n' | grep -qxF "$1"
+}
 
-# List all source files under CODE_ROOTS, honoring EXCLUDE_FILES.
-# Iterates each extension as its own find call to keep glob patterns safely quoted.
+pass() {
+  if [ "$JSON_OUTPUT" -eq 1 ]; then
+    local msg_esc; msg_esc=$(printf '%s' "$*" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    JSON_CHECKS+=("{\"category\":\"${CURRENT_CATEGORY}\",\"status\":\"pass\",\"message\":\"${msg_esc}\"}")
+  elif [ "$QUIET_OUTPUT" -eq 0 ]; then
+    echo "  ✓ $*"
+  fi
+}
+warn() {
+  WARNS=$((WARNS+1))
+  if [ "$JSON_OUTPUT" -eq 1 ]; then
+    local msg_esc; msg_esc=$(printf '%s' "$*" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    JSON_CHECKS+=("{\"category\":\"${CURRENT_CATEGORY}\",\"status\":\"warn\",\"message\":\"${msg_esc}\"}")
+  else
+    echo "  ⚠ $*"
+  fi
+}
+fail() {
+  FAILS=$((FAILS+1))
+  should_fail_on "$CURRENT_CATEGORY" && EXIT_FAILS=$((EXIT_FAILS+1))
+  if [ "$JSON_OUTPUT" -eq 1 ]; then
+    local msg_esc; msg_esc=$(printf '%s' "$*" | sed 's/\\/\\\\/g; s/"/\\"/g')
+    JSON_CHECKS+=("{\"category\":\"${CURRENT_CATEGORY}\",\"status\":\"fail\",\"message\":\"${msg_esc}\"}")
+  else
+    echo "  ✗ $*"
+  fi
+}
+section() {
+  if [ "$JSON_OUTPUT" -eq 0 ]; then
+    echo
+    echo "── $* ──"
+  fi
+}
+
+if [ "$JSON_OUTPUT" -eq 0 ]; then
+  echo "Drift-sweep in: $(pwd)"
+  echo "  CODE_ROOTS: ${CODE_ROOTS}"
+  [ -n "$EXCLUDE_FILES" ] && echo "  EXCLUDE_FILES: ${EXCLUDE_FILES}"
+fi
+
+# ── List source files helper ──────────────────────────────────
 list_source_files() {
   for root in $CODE_ROOTS; do
     [ -d "$root" ] || continue
@@ -64,11 +132,8 @@ list_source_files() {
   done | { if [ -n "$EXCLUDE_FILES" ]; then grep -vE "$EXCLUDE_FILES"; else cat; fi; }
 }
 
-echo "Drift-sweep in: $(pwd)"
-echo "  CODE_ROOTS: ${CODE_ROOTS}"
-[ -n "$EXCLUDE_FILES" ] && echo "  EXCLUDE_FILES: ${EXCLUDE_FILES}"
-
 # ── 1. Working-tree health ────────────────────────────────────
+CURRENT_CATEGORY="working-tree"
 section "Working-tree health"
 if [ -d .git ]; then
   shortstat=$(git diff --shortstat HEAD 2>/dev/null || true)
@@ -105,6 +170,7 @@ else
 fi
 
 # ── 2. Untracked important docs ───────────────────────────────
+CURRENT_CATEGORY="untracked-docs"
 section "Untracked important docs"
 if [ -d .git ]; then
   untracked_important=$(git ls-files --others --exclude-standard 2>/dev/null \
@@ -120,6 +186,7 @@ if [ -d .git ]; then
 fi
 
 # ── 3. Known-cruft directories + versioned backups ────────────
+CURRENT_CATEGORY="cruft"
 section "Known-cruft directories + versioned backups"
 cruft_found=0
 if [ -d .git ]; then
@@ -150,6 +217,7 @@ fi
 [ "$cruft_found" -eq 0 ] && pass "no obvious cruft directories or versioned backups"
 
 # ── 4. File-header probe journals ─────────────────────────────
+CURRENT_CATEGORY="file-journals"
 section "File-header probe journals"
 header_hits=0
 while IFS= read -r f; do
@@ -164,15 +232,13 @@ done < <(list_source_files)
 [ "$header_hits" -eq 0 ] && pass "no file-header probe journals over threshold"
 
 # ── 5. Orphaned exports ───────────────────────────────────────
+CURRENT_CATEGORY="orphans"
 section "Orphaned exports"
 orphan_count=0
 
-# Collect all source files into a tmp file for grep -f-friendly bulk searching.
 src_list=$(mktemp 2>/dev/null || echo "/tmp/drift-sweep-srclist.$$")
 list_source_files > "$src_list"
 
-# Build a single concatenated text of all source files for fast bulk symbol search.
-# This is much faster than grep-per-symbol when there are many exports.
 bulk_text=$(mktemp 2>/dev/null || echo "/tmp/drift-sweep-bulk.$$")
 while IFS= read -r f; do
   [ -f "$f" ] && cat "$f" >> "$bulk_text"
@@ -183,7 +249,6 @@ while IFS= read -r f; do
   [ -z "$f" ] || [ ! -f "$f" ] && continue
   basename_f=$(basename "$f")
   case "$basename_f" in index.* | mod.d.ts) continue ;; esac
-  # Extract exports: function | const | class | let | var | interface | type | enum
   while IFS=: read -r lineno line; do
     sym=$(echo "$line" | sed -nE 's/^[[:space:]]*export[[:space:]]+(async[[:space:]]+)?(function|const|class|let|var|interface|type|enum)[[:space:]]+([A-Za-z_][A-Za-z_0-9]*).*$/\3/p')
     [ -z "$sym" ] && continue
@@ -192,11 +257,6 @@ while IFS= read -r f; do
     if [ "$kind" = "type" ] || [ "$kind" = "interface" ]; then continue; fi
     if echo "$sym" | grep -qE "$ORPHAN_EXPORT_ALLOWLIST"; then continue; fi
 
-    # Count references outside the defining file.
-    # Strip comment-only lines first so stale documentation references
-    # (e.g. "// commandMoveTo (broken for bot-only teams)" in config.ts)
-    # don't count as live usage. Common comment leaders: //, #, *, /*.
-    # Use the bulk concatenated text minus this file's lines for speed.
     self_count=$(grep -vE '^[[:space:]]*(//|#|\*|/\*)' "$f" 2>/dev/null | grep -cE "\\b${sym}\\b" || true)
     total_count=$(grep -vE '^[[:space:]]*(//|#|\*|/\*)' "$bulk_text" 2>/dev/null | grep -cE "\\b${sym}\\b" || true)
     external=$((total_count - self_count))
@@ -212,6 +272,7 @@ rm -f "$src_list" "$bulk_text" 2>/dev/null
 [ "$orphan_count" -eq 0 ] && pass "no orphaned exports detected"
 
 # ── 6. Substrate vs. code freshness ───────────────────────────
+CURRENT_CATEGORY="mission-freshness"
 section "Substrate vs. code freshness"
 if [ -d .git ]; then
   newest_code=0
@@ -242,6 +303,7 @@ if [ -d .git ]; then
 fi
 
 # ── 7. CLAUDE.md path-rules table sanity ──────────────────────
+CURRENT_CATEGORY="claude-md"
 section "CLAUDE.md path-rules table"
 if [ -f CLAUDE.md ]; then
   if grep -qE '^\| Glob \|' CLAUDE.md; then
@@ -254,12 +316,35 @@ else
 fi
 
 # ── Summary ───────────────────────────────────────────────────
-echo
-echo "── Summary ──"
-echo "Failures: $FAILS"
-echo "Warnings: $WARNS"
+if [ "$JSON_OUTPUT" -eq 1 ]; then
+  fail_on_display="${FAIL_ON_CATEGORIES:-all}"
+  echo "{"
+  echo "  \"repo\": \"$(pwd)\","
+  echo "  \"code_roots\": \"${CODE_ROOTS}\","
+  echo "  \"failures\": ${FAILS},"
+  echo "  \"warnings\": ${WARNS},"
+  echo "  \"exit_failures\": ${EXIT_FAILS},"
+  echo "  \"fail_on\": \"${fail_on_display}\","
+  echo "  \"checks\": ["
+  count=${#JSON_CHECKS[@]}
+  for i in "${!JSON_CHECKS[@]}"; do
+    if [ $((i + 1)) -lt "$count" ]; then
+      echo "    ${JSON_CHECKS[$i]},"
+    else
+      echo "    ${JSON_CHECKS[$i]}"
+    fi
+  done
+  echo "  ]"
+  echo "}"
+else
+  echo
+  echo "── Summary ──"
+  echo "Failures: $FAILS"
+  echo "Warnings: $WARNS"
+  [ -n "$FAIL_ON_CATEGORIES" ] && echo "Gated on: ${FAIL_ON_CATEGORIES} (exit failures: ${EXIT_FAILS})"
+fi
 
-if [ "$FAILS" -gt 0 ]; then
+if [ "$EXIT_FAILS" -gt 0 ]; then
   exit 1
 fi
 exit 0
