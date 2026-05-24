@@ -182,13 +182,13 @@ ADEOF
 echo "Seeded ${ADR_FILE}"
 
 # ── Update ADR index ──────────────────────────────────────────────────────────
-README_CHLOEAI="ai_context/decisions/README.ai"
-if [[ -f "$README_CHLOEAI" ]]; then
+README_AI="ai_context/decisions/README.ai"
+if [[ -f "$README_AI" ]]; then
   # Append stack ADR row to the index table if not already present
-  if ! grep -q "001-stack-choice" "$README_CHLOEAI"; then
+  if ! grep -q "001-stack-choice" "$README_AI"; then
     "${SED_INPLACE[@]}" \
       "s|## Index|## Index\n\n| ADR | Title | Status |\n|-----|-------|--------|\n| [001](001-stack-choice.ai) | Stack Choice — ${STACK_DISPLAY} | Accepted |" \
-      "$README_CHLOEAI" 2>/dev/null || true
+      "$README_AI" 2>/dev/null || true
   fi
 fi
 

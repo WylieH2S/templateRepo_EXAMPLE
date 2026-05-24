@@ -15,14 +15,12 @@ bash ~/.claude/skills/fleet-status/fleet-status.sh
 
 ## What it does
 
-Walks every git repo in the workspace root, finds the latest `@DATE|SESSION|` HANDOFF block in `readme_AI.chloeai` (or `readme_AI.ai`), and prints:
+Walks every git repo in the workspace root, finds the latest `@DATE|SESSION|` HANDOFF block in `readme_AI.ai`, and prints:
 
 - Zoom level, recommended model/effort
 - Reason (truncated to 100 chars)
 - Up to 3 queued tasks with tier label
 - Signed model
-
-Handles both `.chloeai` (existing repos) and `.ai` (template-based repos) cartridge extensions.
 
 ## Flags
 

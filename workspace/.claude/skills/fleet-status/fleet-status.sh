@@ -45,15 +45,7 @@ for repo_path in "$WORKSPACE_ROOT"/*/; do
     [ -d "$repo_path/.git" ] || continue
     REPOS_FOUND=$((REPOS_FOUND + 1))
 
-    # Find cartridge — .chloeai for existing repos, .ai for newer template-based ones
-    cartridge=""
-    for ext in chloeai ai; do
-        candidate="$repo_path/readme_AI.$ext"
-        if [ -f "$candidate" ]; then
-            cartridge="$candidate"
-            break
-        fi
-    done
+    cartridge="$repo_path/readme_AI.ai"
 
     if [ -z "$cartridge" ]; then
         REPOS_NO_CARTRIDGE+=("$repo_name")
