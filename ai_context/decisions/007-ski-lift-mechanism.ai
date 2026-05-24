@@ -1,0 +1,59 @@
+#AI:1
+# ADR-007: Formalize Ski-Lift Tooling Intelligence Mechanism
+**Status:** Accepted
+**Date:** 2026-04-30
+**Signed:** WH
+
+## Context
+
+AI assistants sometimes accept manual or suboptimal workflows because they don't surface alternatives — either assuming a tool doesn't exist, not recognizing a pattern, or not knowing the user would want to hear about it. This creates a failure mode where the AI reinforces inefficiency instead of flagging it.
+
+The user identified this directly: "let me know if we're fighting uphill while a ski lift goes by." The mental model: if there's a tool, feature, library, or platform capability that would automate or eliminate what we're doing manually, say so — don't just power through.
+
+## Decision
+
+Formalize a **SKI LIFT** signal alongside the existing FLAG signal in HI Mode:
+
+**SKI LIFT definition:** Raised when the AI observes:
+- We are doing X manually, and a tool/library/feature/CLI/platform would automate it
+- We are implementing something that is a solved problem with better solutions available
+- We are working around a constraint that has a simpler bypass via existing tooling
+- A relevant new capability (AI, platform, package) has emerged that changes the calculus
+
+**Signal format (inline):**
+```
+SKI LIFT: [what we're doing manually] → [the ski lift] | effort: [low/medium/high to adopt] | why it matters: [one sentence]
+```
+
+**Persistence:** Append every SKI LIFT to a log file so they survive session boundaries:
+- Per-repo: `ai_context/ski_lift_log.ai`
+- Cross-cutting (applies to multiple repos or the workflow itself): `.claude/skills/hi-mode/ski_lift_log.ai`
+
+**Log entry format:**
+```
+### YYYY-MM-DD | [REPO or CROSS-CUTTING] | Short Title
+**Doing manually:** ...
+**The ski lift:** [tool/feature/library + link if known]
+**Adoption effort:** low | medium | high
+**Why it matters:** ...
+**Status:** Open | Adopted (YYYY-MM-DD) | Declined (reason)
+```
+
+**Review cadence:** Surface open SKI LIFT items at STRATEGIC zoom sessions.
+
+**The signal is non-blocking.** A SKI LIFT never stops execution. It's a lateral observation. The user decides whether to act on it.
+
+## Alternatives Considered
+
+| Option | Why Rejected |
+|--------|-------------|
+| Ad-hoc mentions, no formalism | Already the current state. Context is lost between sessions. |
+| Block execution until tooling is reviewed | Too disruptive. These are often not urgent. |
+| Separate recommendation sessions | The insight happens in the moment. Deferring to a separate session loses the context around why the flag was raised. |
+
+## Consequences
+
+- Ski lift log grows over time. Periodic pruning of "Adopted" and "Declined" entries keeps it useful.
+- AI must actively watch for ski lifts during normal work — adds a small but persistent cognitive load.
+- Reduces the risk that manual workflows become entrenched simply because no one named the alternative.
+- The mechanism itself is a ski lift: the insight to formalize this came from recognizing a pattern that had no formal channel.

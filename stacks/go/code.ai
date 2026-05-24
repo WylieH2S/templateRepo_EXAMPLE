@@ -1,0 +1,28 @@
+#AI:1
+TYPE="path_rules"
+GLOB="**/*.go"
+
+LANGUAGE_RUNTIME:
+- Go 1.22+ (fill in exact version in go.mod)
+- go modules — no GOPATH-style dependency management
+
+BUILD:
+- go build ./...
+- go vet ./...
+- golangci-lint run
+
+STYLE_CONVENTIONS:
+- gofmt is law — never hand-format
+- goimports for import grouping (stdlib / external / internal)
+- Exported names get godoc comments; unexported names rarely need comments
+- Error wrapping: fmt.Errorf("context: %w", err) — always wrap with context
+- Accept interfaces, return structs (at package boundary)
+
+FORBIDDEN_PATTERNS:
+- No panic() in library code — return errors
+- No init() functions except in main packages — initialization order is a footgun
+- No global mutable state outside of main
+- No log.Fatal() outside of main — callers should decide how to handle errors
+
+EXPLICITLY_NOT_TOUCHING:
+- (fill in: generated protobuf/grpc code, vendor/ directory, etc.)

@@ -174,7 +174,7 @@ CURRENT_CATEGORY="untracked-docs"
 section "Untracked important docs"
 if [ -d .git ]; then
   untracked_important=$(git ls-files --others --exclude-standard 2>/dev/null \
-    | grep -iE '(audit|findings|mission|handoff|decisions|charter|rules).*\.(md|chloeai)$' \
+    | grep -iE '(audit|findings|mission|handoff|decisions|charter|rules).*\.(md|ai)$' \
     || true)
   if [ -n "$untracked_important" ]; then
     while IFS= read -r f; do
@@ -283,7 +283,7 @@ if [ -d .git ]; then
   done < <(list_source_files)
 
   stale_seconds=$((MISSION_STALE_DAYS * 86400))
-  for sub in ai_context/CURRENT_MISSION.md readme_AI.chloeai; do
+  for sub in ai_context/CURRENT_MISSION.md readme_AI.ai; do
     if [ -f "$sub" ]; then
       sub_mt=$(stat -f %m "$sub" 2>/dev/null || stat -c %Y "$sub" 2>/dev/null || echo 0)
       delta=$((newest_code - sub_mt))

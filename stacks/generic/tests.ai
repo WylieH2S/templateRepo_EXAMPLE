@@ -1,0 +1,17 @@
+#AI:1
+TYPE="path_rules"
+GLOB="tests/**, spec/**"
+
+TEST_COMMAND:
+- (fill in: test runner command)
+
+TEST_CONVENTIONS:
+- (fill in: file naming, directory layout, assertion library)
+
+COVERAGE_REQUIREMENTS:
+- (fill in — or "none enforced")
+
+FORBIDDEN_IN_TESTS:
+- No real network calls without explicit mock/stub
+- No skipped tests without a comment and tracking issue
+- (fill in: project-specific forbidden patterns)

@@ -1,0 +1,57 @@
+#AI:1
+TYPE="drift_log"
+SCOPE="cross-cutting (fleet-level code/substrate drift journal)"
+LOCATION="~/<your-workspace>/.repo-manager/drift_log.ai"
+COMPANION_SKILL="~/<your-workspace>/.claude/skills/drift-sweep/"
+RELATED_LOGS="~/.claude/skills/hi-mode/ski_lift_log.ai (tooling adoption — different concern)"
+
+PURPOSE:
+Append-only journal of code/substrate drift findings, tooling rollout actions,
+and accepted-debt decisions across the repo fleet. The mechanism that catches
+drift (drift-sweep skill) lives at .claude/skills/drift-sweep/; this log is
+where what-we-found and what-we-did persists.
+
+REVIEW_CADENCE:
+- Append a new entry after any cross-repo drift sweep, single-repo install,
+  or significant cleanup.
+- Surface Open entries at STRATEGIC zoom sessions.
+- Do not prune Resolved entries — the historical signal (what kinds of drift
+  recur, in which repos) is the point.
+
+ENTRY_FORMAT:
+### YYYY-MM-DD | [REPO or CROSS-CUTTING] | Short Title
+**Type:** sweep | single-repo-finding | install | refactor | accepted-debt
+**Scope:** what was checked or changed
+**Findings:** FAIL/WARN counts + specifics (or "n/a" for non-audit entries)
+**Actions:** what was done — commits, configs added, deferred items
+**Status:** Open | Resolved (YYYY-MM-DD) | Accepted (reason)
+**Notes:** anything that matters for future readers
+
+---
+
+# OPEN DUE-OUTS
+
+The running ledger of deferred commitments. Each session updates this — close
+done items, add new ones surfaced during work.
+
+Format: `- [ ] DO-NNN | YYYY-MM-DD surfaced | source | one-line title`
+
+*(none yet)*
+
+---
+
+# CLOSED DUE-OUTS
+
+(Move items here when done. Keep the historical record; do not delete.)
+
+*(none yet)*
+
+---
+
+# FLEET
+
+(Entries below in reverse chronological order — newest first.)
+
+---
+
+*(first entry goes here)*

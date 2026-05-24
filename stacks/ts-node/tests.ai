@@ -1,0 +1,22 @@
+#AI:1
+TYPE="path_rules"
+GLOB="tests/**, test/**, **/*.test.ts, **/*.spec.ts"
+
+TEST_COMMAND:
+- pnpm test (Vitest or Jest — adjust to actual script)
+- pnpm test:coverage for coverage report
+- pnpm test --run for single non-watch pass
+
+TEST_CONVENTIONS:
+- Test files co-located with source or in tests/ mirroring src/ layout
+- Naming: foo.test.ts for unit, foo.spec.ts for integration (or project convention)
+- One describe block per module, one it/test per behavior
+- Test names are sentences: "returns null when input is empty"
+
+COVERAGE_REQUIREMENTS:
+- (fill in — e.g., "no hard threshold; prefer integration over unit coverage")
+
+FORBIDDEN_IN_TESTS:
+- No real network calls without explicit integration test label
+- No hardcoded ports or file paths — use tmp dirs and dynamic ports
+- No skipped tests (it.skip) without a comment and a tracking issue

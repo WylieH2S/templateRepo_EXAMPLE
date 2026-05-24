@@ -1,0 +1,21 @@
+#AI:1
+TYPE="stack_meta"
+STACK="swift-ios"
+DISPLAY_NAME="Swift / iOS"
+
+DESCRIPTION:
+Native iOS (and optionally macOS) apps in Swift. SwiftUI-first but
+UIKit patterns documented as needed.
+
+RECOMMENDED_TOOLS:
+- Language:      Swift 5.10+ (Xcode-managed)
+- Build:         xcodebuild or swift build (SPM)
+- Test:          XCTest + swift test / xcodebuild test
+- Lint:          SwiftLint
+- Format:        swift-format
+- Dependency:    Swift Package Manager (SPM) preferred over CocoaPods
+
+INIT_NOTES:
+- init-project.sh copies code.ai → .claude/rules/code.ai
+- init-project.sh copies tests.ai → .claude/rules/tests.ai
+- Fill in Xcode version and iOS deployment target before first session

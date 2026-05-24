@@ -1,0 +1,23 @@
+#AI:1
+TYPE="path_rules"
+GLOB="tests/**"
+
+TEST_COMMAND:
+- php artisan test (wraps PHPUnit)
+- ./vendor/bin/pest (if using Pest)
+- php artisan test --coverage for coverage
+
+TEST_CONVENTIONS:
+- Feature tests: tests/Feature/ — hit real routes via $this->get() etc.
+- Unit tests: tests/Unit/ — isolated, no framework boot
+- Pest: describe() + it() for readable specs
+- RefreshDatabase or DatabaseTransactions trait for DB isolation
+- Factories for test data (Laravel factories)
+
+COVERAGE_REQUIREMENTS:
+- (fill in — e.g., "no hard threshold; coverage reported via Xdebug in CI")
+
+FORBIDDEN_IN_TESTS:
+- No real external HTTP calls — use Http::fake()
+- No real queue dispatch in unit tests — use Queue::fake()
+- No skipped tests without a comment and tracking issue

@@ -12,10 +12,10 @@ Each subdirectory is its own git repo with its own substrate. This parent holds 
 
 1. **Operating charter (if present):** `.claude/skills/hi-mode/SKILL.md` — read the latest `SESSION-N` HANDOFF block at the bottom for current zoom, model, task queue, and context. See `SETUP.md` step 3 for setup.
 2. **ROSTER:** `ROSTER.md` — lifecycle status of every repo (ACTIVE / DORMANT / BLOCKED / NEW / HELD / TEMPLATE / MAINTAINED).
-3. **Most recent audit:** `.repo-manager/audits/` (latest by date) — historical markdown audits. Going forward, fleet drift findings live in `drift_log.chloeai` (see step 5).
+3. **Most recent audit:** `.repo-manager/audits/` (latest by date) — historical markdown audits. Going forward, fleet drift findings live in `drift_log.ai` (see step 5).
 4. **Inbox:** `.repo-manager/inbox.md` — between-session notes from prior sessions.
-5. **Drift findings journal:** `.repo-manager/drift_log.chloeai` — fleet code/substrate drift state. Read when investigating drift or after a cross-repo sweep.
-6. **Cross-cutting tooling intelligence (if present):** `.claude/skills/hi-mode/ski_lift_log.chloeai` — read at STRATEGIC zoom; skip at OPERATIONAL.
+5. **Drift findings journal:** `.repo-manager/drift_log.ai` — fleet code/substrate drift state. Read when investigating drift or after a cross-repo sweep.
+6. **Cross-cutting tooling intelligence (if present):** `.claude/skills/hi-mode/ski_lift_log.ai` — read at STRATEGIC zoom; skip at OPERATIONAL.
 
 **Workspace skills** (callable from any repo subdirectory):
 - `.claude/skills/validate-substrate/` — structural substrate compliance check
@@ -37,13 +37,13 @@ Each subdirectory is its own git repo with its own substrate. This parent holds 
 ├── .claude/skills/
 │   ├── hi-mode/
 │   │   ├── SKILL.md                   (HI Mode charter + HANDOFF LOG)
-│   │   └── ski_lift_log.chloeai       (cross-cutting tooling intelligence)
+│   │   └── ski_lift_log.ai       (cross-cutting tooling intelligence)
 │   ├── validate-substrate/            (canonical — repos symlink here)
 │   └── drift-sweep/                   (canonical — repos symlink here)
 ├── .repo-manager/
 │   ├── README.md                      (workspace conventions)
 │   ├── audits/                        (historical markdown logs — legacy)
-│   ├── drift_log.chloeai              (fleet drift findings journal)
+│   ├── drift_log.ai              (fleet drift findings journal)
 │   ├── playbooks/                     (reusable runbooks for cross-repo tasks)
 │   └── inbox.md                       (between-session quick capture)
 └── [project subdirectories]           (each a self-contained git repo)
@@ -59,10 +59,10 @@ Each subdirectory is its own git repo with its own substrate. This parent holds 
 
 - `ai_context/` — if cross-cutting decisions accumulate (e.g., decisions affecting *all* repos)
 - `WORKSHEET.heywy` — if a cross-repo input channel is needed beyond the HI Mode HANDOFF LOG
-- `readme_AI.chloeai` — if active cross-cutting threads need a dedicated cartridge
+- `readme_AI.ai` — if active cross-cutting threads need a dedicated cartridge
 
 ## Non-negotiables
 
 - This is not a git repo. Do not `git init` here without explicit approval — subdirectory repos and a parent repo together create confusion (lockfile collisions, nested-status weirdness).
 - Per-repo work happens **in** that repo's directory, not here.
-- Cross-repo drift work gets logged in `.repo-manager/drift_log.chloeai` (chloeai journal, append-only). The legacy `.repo-manager/audits/` markdown logs are historical — do not add new ones.
+- Cross-repo drift work gets logged in `.repo-manager/drift_log.ai` (append-only journal). The legacy `.repo-manager/audits/` markdown logs are historical — do not add new ones.

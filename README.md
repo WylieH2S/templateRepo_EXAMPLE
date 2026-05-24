@@ -22,8 +22,8 @@ After bootstrap:
 | File | Purpose |
 |---|---|
 | `CLAUDE.md` | Path-routing table. Auto-loaded by Claude Code. Defines Tier 1 / path-scoped / Tier 2 file layout. |
-| `STARTUP_AI.chloeai` | Boot file. Defines READ_ORDER and operating rules. Tool-agnostic — Codex and other agents read this too. |
-| `readme_AI.chloeai` | Active state cartridge: THREADS, ASSUMPTIONS, latest HANDOFF. |
+| `STARTUP_AI.ai` | Boot file. Defines READ_ORDER and operating rules. Tool-agnostic — Codex and other agents read this too. |
+| `readme_AI.ai` | Active state cartridge: THREADS, ASSUMPTIONS, latest HANDOFF. |
 | `AGENTS.md` | Pointer for non-Claude agents. |
 | `init-project.sh` | One-shot bootstrap (self-deletes after run). |
 
@@ -42,7 +42,7 @@ After bootstrap:
 
 ## HI Mode
 
-The operating charter — values, stop-the-line, git safety, design review gate, zoom levels, session wrap. Per-project `ai_modules/hi_mode.chloeai` is a thin EXTENDS shim pointing to the central charter at `~/.claude/skills/hi-mode/SKILL.md`. The shim may ADD project-specific overrides but cannot remove or override central rules.
+The operating charter — values, stop-the-line, git safety, design review gate, zoom levels, session wrap. Per-project `ai_modules/hi_mode.ai` is a thin EXTENDS shim pointing to the central charter at `~/.claude/skills/hi-mode/SKILL.md`. The shim may ADD project-specific overrides but cannot remove or override central rules.
 
 Top values (priority order):
 1. Truth > momentum
@@ -61,7 +61,7 @@ Checks Tier 1 file presence, path-scoped rules, ai_modules, EXTENDS path resolut
 
 ## HANDOFF / ZOOM / Tier Format
 
-Every session appends a HANDOFF block to `readme_AI.chloeai`:
+Every session appends a HANDOFF block to `readme_AI.ai`:
 
 ```
 @YYYY-MM-DD|SESSION-N|

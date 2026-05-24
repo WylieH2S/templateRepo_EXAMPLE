@@ -1,0 +1,29 @@
+#AI:1
+TYPE="path_rules"
+GLOB="tests/**, spec/**"
+
+PURPOSE:
+Rules active when touching test files. Loaded on demand — not every session.
+Fill in for your project. Delete sections that don't apply.
+
+---
+
+TEST_COMMAND:
+; How to run the test suite.
+; e.g., "pytest -q tests/" / "go test ./..." / "npm test"
+- (fill in)
+
+TEST_CONVENTIONS:
+; File naming, directory layout, fixture patterns.
+; e.g., "test files mirror src/ layout: tests/foo/test_bar.py for src/foo/bar.py"
+- (fill in)
+
+COVERAGE_REQUIREMENTS:
+; e.g., "new code must have test coverage before merging"
+; e.g., "no coverage requirement — prefer integration tests over unit tests"
+- (fill in)
+
+FORBIDDEN_IN_TESTS:
+; e.g., "no mocking the database — integration tests must hit a real test DB"
+; e.g., "no skipped tests without an explanatory comment and a tracking ticket"
+- (fill in)

@@ -22,7 +22,7 @@ This workspace persists across sessions so the next session can pick up cleanly.
 ├── README.md               This file
 ├── audits/                 Legacy logs of cross-repo operations (one file per audit)
 ├── playbooks/              Reusable runbooks for common cross-repo tasks
-├── drift_log.chloeai       Fleet drift findings journal (append-only; preferred over audits/)
+├── drift_log.ai       Fleet drift findings journal (append-only; preferred over audits/)
 └── inbox.md                Quick-capture notes between sessions
 ```
 
@@ -30,7 +30,7 @@ This workspace persists across sessions so the next session can pick up cleanly.
 
 ## Conventions
 
-### Drift Log (`drift_log.chloeai`)
+### Drift Log (`drift_log.ai`)
 
 Append-only journal of code/substrate drift findings and OPEN DUE-OUTS across the fleet. Add entries after any cross-repo sweep, cleanup, or tooling rollout. This is the preferred home for new findings — `audits/` is legacy.
 
@@ -38,9 +38,9 @@ Append-only journal of code/substrate drift findings and OPEN DUE-OUTS across th
 
 A playbook is a written-down version of a repeatable cross-repo task. Write one the second time you do something, not the first. Examples:
 - "Adding a new repo to substrate compliance"
-- "Rotating a bloated AI_HANDOFF.chloeai into an archive"
+- "Rotating a bloated AI_HANDOFF.ai into an archive"
 - "Cleaning git history of a repo that tracked large files"
 
 ### Inbox (`inbox.md`)
 
-Single-file scratch for thoughts that don't fit elsewhere. Periodically clean — promote to `drift_log.chloeai`, playbooks, or ROSTER as appropriate.
+Single-file scratch for thoughts that don't fit elsewhere. Periodically clean — promote to `drift_log.ai`, playbooks, or ROSTER as appropriate.

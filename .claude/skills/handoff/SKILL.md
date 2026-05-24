@@ -9,7 +9,7 @@ Automates the SESSION wrap protocol from HI Mode. Captures session-end state in 
 
 ## What this skill does
 
-1. Determine the target file: prefer `readme_AI.chloeai`'s `HANDOFF_LOG:` section if present; otherwise append to `AI_HANDOFF.chloeai`.
+1. Determine the target file: prefer `readme_AI.ai`'s `HANDOFF_LOG:` section if present; otherwise append to `AI_HANDOFF.ai`.
 2. Find the next SESSION-N number by scanning prior entries.
 3. Collect the HANDOFF fields. Infer from the current session where possible; ask the user only for fields that require judgment.
 4. Format and append the block.

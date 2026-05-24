@@ -9,8 +9,8 @@ This is the **parent workspace** for all WORKSPACE_OWNER projects. This folder i
 1. **Operating charter (if present):** `.claude/skills/hi-mode/SKILL.md` — read the latest `@date|SESSION-N|` HANDOFF block for current zoom level, recommended model/effort, task queue, and context. See `SETUP.md` step 3 for setup.
 2. **Repo roster:** `ROSTER.md` — lifecycle status of every repo (ACTIVE / DORMANT / BLOCKED / NEW / HELD / TEMPLATE / MAINTAINED).
 3. **Inbox:** `.repo-manager/inbox.md` — between-session notes from prior sessions.
-4. **Drift findings:** `.repo-manager/drift_log.chloeai` — fleet drift state and OPEN DUE-OUTS ledger. Read when investigating drift or after a sweep.
-5. **Tooling intelligence (if present):** `.claude/skills/hi-mode/ski_lift_log.chloeai` — read at STRATEGIC zoom; skip at OPERATIONAL.
+4. **Drift findings:** `.repo-manager/drift_log.ai` — fleet drift state and OPEN DUE-OUTS ledger. Read when investigating drift or after a sweep.
+5. **Tooling intelligence (if present):** `.claude/skills/hi-mode/ski_lift_log.ai` — read at STRATEGIC zoom; skip at OPERATIONAL.
 
 ## When working on a specific repo
 
@@ -20,7 +20,7 @@ Enter that subdirectory and follow its own `AGENTS.md`. Each repo has its own su
 
 - This folder is not a git repo. Do not `git init` here.
 - Per-repo work happens inside that repo's directory, not here.
-- Cross-repo drift findings go in `.repo-manager/drift_log.chloeai` (append-only journal).
+- Cross-repo drift findings go in `.repo-manager/drift_log.ai` (append-only journal).
 
 ## Layout
 
@@ -34,7 +34,7 @@ GitHub/
 │   ├── validate-substrate/            (structural compliance check skill)
 │   └── drift-sweep/                   (code/substrate consistency check skill)
 ├── .repo-manager/
-│   ├── drift_log.chloeai              (fleet drift findings journal)
+│   ├── drift_log.ai              (fleet drift findings journal)
 │   ├── inbox.md                       (between-session quick capture)
 │   └── playbooks/                     (reusable runbooks for cross-repo tasks)
 └── [project subdirectories]           (each a self-contained git repo)

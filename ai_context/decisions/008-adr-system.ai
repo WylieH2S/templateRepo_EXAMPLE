@@ -1,0 +1,46 @@
+#AI:1
+# ADR-008: Adopt Structured ADR System Alongside decision_log.md
+**Status:** Accepted
+**Date:** 2026-04-30
+**Signed:** WH
+
+## Context
+
+`ai_context/decision_log.md` exists in the template as a flat, append-only log of decisions still in effect. It's lightweight and effective for operational decisions ("picked library X for Y task"). It lacks structure for:
+- Documenting rejected alternatives and why
+- Citing research or external work backing a decision
+- Marking decisions as superseded with a clean forward pointer
+- Serving as a reference for future AI sessions to understand *why* a constraint exists (not just that it does)
+
+ADRs (Architecture Decision Records) add that structure. The question was whether to replace decision_log.md or run both.
+
+## Decision
+
+Run both. Different tools, different jobs:
+
+| Tool | Format | Use for |
+|------|--------|---------|
+| `decision_log.md` | Flat append-only | Operational decisions: library picks, quick tradeoffs, "we tried X and it didn't work" |
+| `ai_context/decisions/*.ai` | Structured ADR | Architectural decisions: patterns, conventions, methodology choices, anything with rejected alternatives or research backing |
+
+**ADR format:** Status / Date / Signed / Context / Decision / Alternatives Considered / Consequences / Credits-Attribution (if applicable).
+
+**ADR naming:** `NNN-short-kebab-title.ai`. Numbers are sequential, not reused. Superseded ADRs are marked in their Status field with a pointer to the superseding ADR — they are NOT deleted.
+
+**ADR extension:** `.ai` — ADRs are AI-facing artifacts (Tier 2, on-demand reference). Humans can read them but they are primarily for AI session context.
+
+**Index:** `README.ai` in the decisions/ folder maintains the ADR index. Update it whenever a new ADR is written.
+
+## Alternatives Considered
+
+| Option | Why Rejected |
+|--------|-------------|
+| Replace decision_log.md with ADRs entirely | decision_log.md's lightweight format is right for operational decisions. ADRs are heavier — wrong tool for "switched from lib A to lib B." |
+| Keep only decision_log.md, extend its format | Would make decision_log.md heavy for simple entries. Mixing formats in one file is messy. |
+| Use .md for ADRs (not .ai) | ADRs are AI-facing reference material, not software docs. .ai matches their audience per ADR-004. |
+
+## Consequences
+
+- Two decision-tracking artifacts per repo. Both are Tier 2 — neither loads by default.
+- ADRs self-document the system's reasoning history. A new AI session can read decisions/ to understand why constraints exist without relitigating them.
+- This ADR (ADR-008) is itself evidence of the system working: the decision to adopt ADRs is captured as an ADR.

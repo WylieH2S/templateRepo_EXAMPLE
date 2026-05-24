@@ -1,0 +1,55 @@
+#AI:1
+TYPE="path_rules"
+GLOB="docs/**, README.md"
+
+PURPOSE:
+Rules active when touching documentation files. Loaded on demand. Fill in the
+ownership table for this project as docs accumulate.
+
+---
+
+AUDIENCE:
+- docs/ is project reference: design intent, contracts, roadmaps, phase briefs.
+- README.md is the GitHub-facing introduction for human readers.
+- Engineering audience: future-you, future-AI sessions, external contributors.
+
+---
+
+FORMAT_CONVENTIONS:
+- Markdown only. No HTML in doc files except where unavoidable (e.g., complex tables).
+- Sentence case headings, not title case.
+- Fenced code blocks with language hints for any code samples.
+- Soft 100-char line wrap for diff readability. Do not reflow existing docs uninvited.
+- Mark each new doc with a status header at top: ACTIVE | FROZEN | SUPERSEDED-BY-<path>
+
+---
+
+DOC_OWNERSHIP:
+
+Fill in this table as docs accumulate. Status markers:
+- ACTIVE          — current, actively maintained
+- FROZEN          — historical record, do not edit
+- SUPERSEDED-BY-X — replaced; X is the path of the replacement
+
+| File | Owner | Status | Last reviewed | Rules |
+|------|-------|--------|---------------|-------|
+| `README.md` | Public-facing | ACTIVE | (date) | Keep brief and accurate. Status should mirror readme_AI.ai STATUS field. |
+| `docs/project-brief.md` | Project (authoritative) | ACTIVE | (date) | Source of truth for project identity + invariants. Mark superseded clauses SUPERSEDED rather than deleting. |
+| `docs/roadmap.md` | Project (authoritative) | ACTIVE | (date) | High-level roadmap. Update phase status as milestones close. |
+| `docs/phase-N-brief.md` | Frozen archive | FROZEN | (date) | Historical phase brief. Do not edit. |
+
+---
+
+NEW_DOC_GUIDELINES:
+- New design docs go in docs/ with kebab-case-name.md filename.
+- Mark the doc's status at top: `**Status:** ACTIVE | FROZEN | SUPERSEDED-BY-<path>`
+- Reference any related DEC-NNN, EXP-NNN, or THR-NNN by ID in the body to cross-link with continuity files.
+- Add a row to the DOC_OWNERSHIP table above.
+
+---
+
+DO_NOT:
+- Do not duplicate continuity content (THREADS, EXPERIMENTS, DECISIONS) into docs/. Continuity lives in ai_context/.
+- Do not rewrite frozen archive docs to "update" them. If new direction conflicts, create a new doc and mark the old one SUPERSEDED-BY-<new-doc>.
+- Do not commit auto-generated documentation derived from source unless the generator is checked in and reproducible.
+- Do not rename a doc that other docs reference without updating the references in the same commit.

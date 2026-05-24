@@ -76,7 +76,7 @@ jobs:
       - name: Required substrate files exist
         run: |
           missing=""
-          for f in CLAUDE.md readme_AI.chloeai AI_HANDOFF.chloeai .gitignore; do
+          for f in CLAUDE.md readme_AI.ai AI_HANDOFF.ai .gitignore; do
             if [ ! -f "$f" ]; then
               missing="$missing $f"
             fi

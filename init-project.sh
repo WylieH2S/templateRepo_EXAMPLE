@@ -89,11 +89,11 @@ fi
 mkdir -p "$RULES_DIR"
 
 echo "Copying stack rules → ${RULES_DIR}/"
-cp "${STACK_DIR}/code.chloeai"  "${RULES_DIR}/code.chloeai"
-cp "${STACK_DIR}/tests.chloeai" "${RULES_DIR}/tests.chloeai"
+cp "${STACK_DIR}/code.ai"  "${RULES_DIR}/code.ai"
+cp "${STACK_DIR}/tests.ai" "${RULES_DIR}/tests.ai"
 
 # ── Append stack metadata into technical_reference.md ────────────────────────
-STACK_META="${STACK_DIR}/stack.chloeai"
+STACK_META="${STACK_DIR}/stack.ai"
 TECH_REF="ai_context/technical_reference.md"
 
 if [[ -f "$STACK_META" && -f "$TECH_REF" ]]; then
@@ -104,9 +104,9 @@ if [[ -f "$STACK_META" && -f "$TECH_REF" ]]; then
     echo ""
     echo "## Stack Starter Pack — ${STACK_DISPLAY}"
     echo ""
-    echo "Seeded from \`stacks/${STACK}/stack.chloeai\` at bootstrap (${TODAY})."
+    echo "Seeded from \`stacks/${STACK}/stack.ai\` at bootstrap (${TODAY})."
     echo ""
-    # Extract DESCRIPTION and RECOMMENDED_TOOLS sections from stack.chloeai.
+    # Extract DESCRIPTION and RECOMMENDED_TOOLS sections from stack.ai.
     # Format is plain blocks delimited by all-caps headers ending in colon.
     awk '
       /^DESCRIPTION:/ { in_block=1; print "### Description"; print ""; next }
@@ -127,7 +127,7 @@ while IFS= read -r -d '' f; do
 done < <(
   find . \
     -type f \
-    \( -name "*.md" -o -name "*.chloeai" -o -name "*.heywy" -o -name "*.sh" \) \
+    \( -name "*.md" -o -name "*.ai" -o -name "*.heywy" -o -name "*.sh" \) \
     ! -name "init-project.sh" \
     ! -path "./.git/*" \
     ! -path "./stacks/*" \
@@ -150,10 +150,10 @@ for f in "${FILES[@]}"; do
 done
 
 # ── Seed ADR-001 for stack choice ─────────────────────────────────────────────
-ADR_FILE="ai_context/decisions/001-stack-choice.chloeai"
+ADR_FILE="ai_context/decisions/001-stack-choice.ai"
 
 cat > "$ADR_FILE" <<ADEOF
-#CHLOEAI:1
+#AI:1
 # ADR-001: Stack Choice — ${STACK_DISPLAY}
 **Status:** Accepted
 **Date:** ${TODAY}
@@ -174,7 +174,7 @@ Use **${STACK_DISPLAY}** (stacks/${STACK}/).
 | generic | Would require filling in all rules from scratch |
 
 ## Consequences
-- .claude/rules/code.chloeai and tests.chloeai are pre-seeded for ${STACK_DISPLAY}.
+- .claude/rules/code.ai and tests.ai are pre-seeded for ${STACK_DISPLAY}.
 - Fill in version pins, build commands, and project-specific rules before first AI session.
 - stacks/ directory can be deleted once rules are finalized.
 ADEOF
@@ -182,12 +182,12 @@ ADEOF
 echo "Seeded ${ADR_FILE}"
 
 # ── Update ADR index ──────────────────────────────────────────────────────────
-README_CHLOEAI="ai_context/decisions/README.chloeai"
+README_CHLOEAI="ai_context/decisions/README.ai"
 if [[ -f "$README_CHLOEAI" ]]; then
   # Append stack ADR row to the index table if not already present
   if ! grep -q "001-stack-choice" "$README_CHLOEAI"; then
     "${SED_INPLACE[@]}" \
-      "s|## Index|## Index\n\n| ADR | Title | Status |\n|-----|-------|--------|\n| [001](001-stack-choice.chloeai) | Stack Choice — ${STACK_DISPLAY} | Accepted |" \
+      "s|## Index|## Index\n\n| ADR | Title | Status |\n|-----|-------|--------|\n| [001](001-stack-choice.ai) | Stack Choice — ${STACK_DISPLAY} | Accepted |" \
       "$README_CHLOEAI" 2>/dev/null || true
   fi
 fi
@@ -220,13 +220,13 @@ echo "=== Bootstrap complete ==="
 echo "  Project:  ${PROJECT_NAME}"
 echo "  Owner:    ${OWNER_NAME}"
 echo "  Stack:    ${STACK_DISPLAY}"
-echo "  Rules:    .claude/rules/code.chloeai + tests.chloeai"
+echo "  Rules:    .claude/rules/code.ai + tests.ai"
 echo "  ADR-001:  ${ADR_FILE}"
 echo
 echo "Next steps:"
-echo "  1. Fill in version pins and build commands in .claude/rules/code.chloeai"
+echo "  1. Fill in version pins and build commands in .claude/rules/code.ai"
 echo "  2. Fill in ai_context/project_brief.md and ai_context/CURRENT_MISSION.md"
-echo "  3. Confirm ai_modules/hi_mode.chloeai EXTENDS path resolves (defaults to ~/.claude/skills/hi-mode/SKILL.md)"
+echo "  3. Confirm ai_modules/hi_mode.ai EXTENDS path resolves (defaults to ~/.claude/skills/hi-mode/SKILL.md)"
 echo "  4. Run: bash .claude/skills/validate-substrate/validate.sh  (should pass with 0 failures)"
 echo "  5. git init && git add . && git commit -m 'bootstrap: ${PROJECT_NAME} from templateRepo_EXAMPLE'"
 echo "  (pre-commit guards: lefthook was activated above if installed, otherwise run 'brew install lefthook && lefthook install')"

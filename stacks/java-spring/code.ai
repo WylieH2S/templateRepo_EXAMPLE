@@ -1,0 +1,28 @@
+#AI:1
+TYPE="path_rules"
+GLOB="src/main/**"
+
+LANGUAGE_RUNTIME:
+- Java 21 LTS (fill in exact version, e.g. "21.0.3")
+- Spring Boot 3.x (fill in exact version)
+- Maven or Gradle — (fill in which, do not switch mid-project)
+
+BUILD:
+- mvn clean verify (Maven) or ./gradlew build (Gradle)
+- mvn checkstyle:check / ./gradlew spotlessCheck for lint
+
+STYLE_CONVENTIONS:
+- Google Java Format enforced by Spotless — do not hand-format
+- Checkstyle rules enforced — do not suppress without a comment
+- Use constructor injection, not field injection (@Autowired on fields)
+- Records preferred over POJOs for simple data carriers (Java 16+)
+- Checked exceptions for recoverable conditions; RuntimeException for bugs
+
+FORBIDDEN_PATTERNS:
+- No field injection (@Autowired on fields) — use constructor injection
+- No System.out.println() — use SLF4J logger
+- No hardcoded credentials or connection strings in source
+- No business logic in @RestController — delegate to @Service
+
+EXPLICITLY_NOT_TOUCHING:
+- (fill in: generated code, migration scripts, etc.)

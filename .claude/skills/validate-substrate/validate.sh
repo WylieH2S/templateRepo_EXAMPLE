@@ -34,7 +34,7 @@ echo "Validating substrate in: $(pwd)"
 
 # ── Tier 1 required files ─────────────────────────────────────
 section "Tier 1 required files"
-for f in CLAUDE.md STARTUP_AI.chloeai readme_AI.chloeai ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/START_HERE.md; do
+for f in CLAUDE.md STARTUP_AI.ai readme_AI.ai ai_context/ai_rules.ai ai_context/glossary.ai ai_context/START_HERE.md; do
   if [ -f "$f" ]; then
     pass "$f"
   else
@@ -46,10 +46,10 @@ done
 section "ai_modules/"
 if [ -d ai_modules ]; then
   pass "ai_modules/ directory"
-  if [ -f ai_modules/hi_mode.chloeai ]; then
-    pass "ai_modules/hi_mode.chloeai"
+  if [ -f ai_modules/hi_mode.ai ]; then
+    pass "ai_modules/hi_mode.ai"
   else
-    fail "ai_modules/hi_mode.chloeai (missing — HI Mode shim required)"
+    fail "ai_modules/hi_mode.ai (missing — HI Mode shim required)"
   fi
 else
   fail "ai_modules/ (missing — required for HI Mode shim)"
@@ -57,8 +57,8 @@ fi
 
 # ── EXTENDS path resolution ───────────────────────────────────
 section "EXTENDS path resolution"
-if [ -f ai_modules/hi_mode.chloeai ]; then
-  extends_raw=$(grep -E '^EXTENDS=' ai_modules/hi_mode.chloeai | head -1 | sed -E 's/^EXTENDS="?([^"]*)"?$/\1/')
+if [ -f ai_modules/hi_mode.ai ]; then
+  extends_raw=$(grep -E '^EXTENDS=' ai_modules/hi_mode.ai | head -1 | sed -E 's/^EXTENDS="?([^"]*)"?$/\1/')
   if [ -n "$extends_raw" ]; then
     # Expand ~ to $HOME
     extends_path="${extends_raw/#\~/$HOME}"
@@ -70,13 +70,13 @@ if [ -f ai_modules/hi_mode.chloeai ]; then
       fail "EXTENDS path not found: $extends_raw (expanded: $extends_path) — central charter missing or moved"
     fi
   else
-    warn "hi_mode.chloeai has no EXTENDS line"
+    warn "hi_mode.ai has no EXTENDS line"
   fi
 fi
 
 # ── Path-scoped rules ─────────────────────────────────────────
 section "Path-scoped rules (.claude/rules/)"
-for f in code.chloeai tests.chloeai ai-context.chloeai docs.chloeai; do
+for f in code.ai tests.ai ai-context.ai docs.ai; do
   path=".claude/rules/$f"
   if [ -f "$path" ]; then
     pass "$path"
@@ -88,9 +88,9 @@ done
 # ── Hygiene ───────────────────────────────────────────────────
 section "Hygiene"
 [ -f .gitignore ] && pass ".gitignore" || fail ".gitignore (missing)"
-[ -f AI_HANDOFF.chloeai ] && pass "AI_HANDOFF.chloeai" || warn "AI_HANDOFF.chloeai (missing — OK for very new repos)"
+[ -f AI_HANDOFF.ai ] && pass "AI_HANDOFF.ai" || warn "AI_HANDOFF.ai (missing — OK for very new repos)"
 [ -f WORKSHEET.heywy ] && pass "WORKSHEET.heywy" || warn "WORKSHEET.heywy (missing)"
-[ -f SIDEQUESTS.chloeai ] && pass "SIDEQUESTS.chloeai" || warn "SIDEQUESTS.chloeai (missing)"
+[ -f SIDEQUESTS.ai ] && pass "SIDEQUESTS.ai" || warn "SIDEQUESTS.ai (missing)"
 
 # ── Tracked junk ──────────────────────────────────────────────
 section "Tracked junk check"
@@ -141,7 +141,7 @@ fi
 section "Freshness"
 ninety_days_ago=$(date -v-90d +%s 2>/dev/null || date -d "90 days ago" +%s)
 
-for f in ai_context/current_state.md AI_HANDOFF.chloeai readme_AI.chloeai; do
+for f in ai_context/current_state.md AI_HANDOFF.ai readme_AI.ai; do
   if [ -f "$f" ]; then
     mtime=$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)
     if [ "$mtime" -lt "$ninety_days_ago" ]; then
@@ -154,18 +154,18 @@ done
 
 # ── Size sanity ───────────────────────────────────────────────
 section "Size sanity"
-if [ -f AI_HANDOFF.chloeai ]; then
-  size=$(wc -c < AI_HANDOFF.chloeai)
+if [ -f AI_HANDOFF.ai ]; then
+  size=$(wc -c < AI_HANDOFF.ai)
   if [ "$size" -gt 204800 ]; then
-    warn "AI_HANDOFF.chloeai is $((size / 1024)) KB — consider rotating older entries to an archive (threshold 200 KB)"
+    warn "AI_HANDOFF.ai is $((size / 1024)) KB — consider rotating older entries to an archive (threshold 200 KB)"
   else
-    pass "AI_HANDOFF.chloeai size OK"
+    pass "AI_HANDOFF.ai size OK"
   fi
 fi
 if [ -f ai_context/current_state.md ]; then
   size=$(wc -c < ai_context/current_state.md)
   if [ "$size" -gt 51200 ]; then
-    warn "ai_context/current_state.md is $((size / 1024)) KB — consider rotating older deltas to readme_AI_archive.chloeai (threshold 50 KB)"
+    warn "ai_context/current_state.md is $((size / 1024)) KB — consider rotating older deltas to readme_AI_archive.ai (threshold 50 KB)"
   else
     pass "ai_context/current_state.md size OK"
   fi

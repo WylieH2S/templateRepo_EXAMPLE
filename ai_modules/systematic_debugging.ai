@@ -1,0 +1,142 @@
+# Systematic Debugging Skill (Project Scope)
+#AI:1
+TYPE="skill"
+MODULE="project_systematic_debugging"
+VERSION="Charter-SystematicDebugging-Project-2026-04"
+LINEAGE="Adapted from obra/superpowers skills/systematic-debugging/SKILL.md"
+SCOPE="single project"
+
+# ============================================================
+# PURPOSE
+# ============================================================
+#
+# When something is broken, fix the root cause, not the symptom.
+# This skill enforces a 4-phase discipline so that debugging produces
+# evidence and one targeted fix, instead of a queue of speculative
+# patches.
+
+# ============================================================
+# WHEN TO INVOKE
+# ============================================================
+#
+# Mandatory triggers:
+# - The owner reports a bug or failed live-test
+# - Two or more prior fix attempts have failed on the same symptom
+# - A behavior change is observed that nobody can immediately explain
+#
+# Subjective triggers:
+# - The owner says "just try X" -- pause and re-frame as a hypothesis
+#   to test, not a fix to apply
+
+# ============================================================
+# PROTOCOL
+# ============================================================
+#
+# Phase 1: ROOT CAUSE INVESTIGATION
+#   Mandatory. Complete this phase BEFORE proposing any fix.
+#   Do:
+#   - Read the actual error / failure carefully (not a paraphrase)
+#   - Reproduce consistently. If you can't reproduce, that IS the
+#     finding -- surface it
+#   - Check recent changes: git log + AI_HANDOFF.ai last 3 entries
+#   - Gather evidence: where does the system break? Trace data flow
+#     through the involved components
+#   Output: a written statement of the form
+#     "Symptom X happens when condition Y is true; the failing
+#      component is Z; relevant evidence: <list>"
+#
+# Phase 2: PATTERN ANALYSIS
+#   Find a working example of the same pattern and compare.
+#   - Read line-by-line. Don't skim
+#   - Identify the exact differences between working and broken
+#   - Understand the dependencies (what does each side rely on?)
+#   Output: a written diff-of-meaning between working and broken,
+#           with the suspected delta named explicitly.
+#
+# Phase 3: HYPOTHESIS
+#   Form ONE hypothesis. State it clearly with reasoning.
+#   - Design the smallest possible change that tests it
+#   - Name what success looks like, name what failure looks like
+#   - If uncertainty is high, research first (read source, fetch docs)
+#   - DO NOT form parallel hypotheses
+#
+# Phase 4: IMPLEMENTATION
+#   Apply ONE fix that addresses the root cause.
+#   - Where possible, write a failing test first (or a live-test
+#     scenario that fails before the fix and passes after)
+#   - Make the smallest change consistent with the root cause
+#   - Verify the fix works (run the test, run the live-test scenario)
+#   - Log the result via the EXPERIMENT_LOG_FORMAT defined in
+#     ai_context/ai_rules.ai (change/expect/observe/repro/revert/location/status)
+#
+# Architecture stop:
+#   If 3+ fixes have failed against the same symptom, STOP patching.
+#   Question the architecture. The bug is upstream of where you've
+#   been looking.
+
+# ============================================================
+# RULES
+# ============================================================
+#
+# - MUST complete Phase 1 before proposing any fix
+# - MUST form one hypothesis at a time
+# - MUST identify root cause, not just a path that suppresses symptom
+# - MUST NOT bundle multiple speculative changes into one build
+# - MUST NOT repeat the "one more fix" pattern past 3 attempts
+
+# ============================================================
+# ANTI-PATTERNS
+# ============================================================
+#
+# These look like progress and are not:
+# - "Just try changing X and see if it works" -- speculation, not test
+# - "Quick patch" -- a patch without root cause is a known-fragile state
+# - Listing multiple fixes without investigation -- generates work,
+#   not understanding
+# - Skipping test creation in favor of "I'll verify manually" -- fine
+#   once, not repeatable
+# - Adapting a reference pattern differently than the working example
+#   without saying why
+# - Prioritizing apparent speed over understanding (it is slower)
+
+# ============================================================
+# STOP CONDITIONS
+# ============================================================
+#
+# Pause and return control to the owner if:
+# - A fix is being proposed before Phase 1 evidence is on paper
+# - The hypothesis cannot be stated in one sentence
+# - The proposed fix touches a subsystem outside the named symptom
+# - 3 fixes have failed (architecture question, not patch question)
+# - The symptom can't be reproduced (reproduction is itself the work)
+
+# ============================================================
+# WRITEBACK TARGETS
+# ============================================================
+#
+# - The full investigation log goes into AI_HANDOFF.ai as a
+#   session entry
+# - The final fix (or the architecture pivot) gets a DELTA entry
+#   per the experiment format
+# - If a finding contradicts ai_context/decision_log.md, add a
+#   superseding decision entry
+
+# ============================================================
+# SELF-TEST
+# ============================================================
+#
+# - Test: Echo module name             --> Expect: "project_systematic_debugging"
+# - Test: How many phases?             --> Expect: "four"
+# - Test: How many hypotheses at once? --> Expect: "one"
+# - Test: After 3 failed fixes?        --> Expect: "stop, question architecture"
+
+# ============================================================
+# CHANGELOG
+# ============================================================
+#
+# Charter-SystematicDebugging-Project-2026-04 ({{TODAY}}, baseline-template
+# bootstrap): Initial version. Adapted from obra/superpowers
+# systematic-debugging skill. 4-phase protocol with explicit
+# anti-patterns and the 3-failed-fixes architecture stop.
+
+# END OF SKILL MODULE

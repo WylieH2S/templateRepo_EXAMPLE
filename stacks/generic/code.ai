@@ -1,0 +1,19 @@
+#AI:1
+TYPE="path_rules"
+GLOB="src/**, lib/**, app/**"
+
+LANGUAGE_RUNTIME:
+- (fill in: language, runtime version, package manager)
+
+BUILD:
+- (fill in: build command, lint command, type check command)
+
+STYLE_CONVENTIONS:
+- (fill in: formatting tool, naming conventions, module layout)
+
+FORBIDDEN_PATTERNS:
+- No hardcoded secrets or API keys in source
+- (fill in: language-specific forbidden patterns)
+
+EXPLICITLY_NOT_TOUCHING:
+- (fill in: generated files, vendored code, off-limits modules)

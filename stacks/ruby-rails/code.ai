@@ -1,0 +1,28 @@
+#AI:1
+TYPE="path_rules"
+GLOB="app/**, lib/**, config/**"
+
+LANGUAGE_RUNTIME:
+- Ruby 3.3+ (fill in exact version in .ruby-version)
+- Rails 7.x or 8.x (fill in exact version)
+- Bundler for gems — do not gem install outside bundle exec
+
+BUILD:
+- No compile step — but run: bundle exec rails assets:precompile for production
+- Lint: bundle exec rubocop
+- DB: bundle exec rails db:migrate
+
+STYLE_CONVENTIONS:
+- RuboCop enforced — no disables without a comment
+- Thin controllers: business logic belongs in service objects or models
+- ActiveRecord callbacks sparingly — prefer explicit service calls
+- Prefer keyword arguments for methods with 3+ parameters
+
+FORBIDDEN_PATTERNS:
+- No raw SQL without sanitization — use ActiveRecord or sanitize_sql
+- No secrets in source — use Rails credentials or env vars
+- No synchronous external HTTP calls in request cycle — use background jobs
+- No puts / p in production code — use Rails.logger
+
+EXPLICITLY_NOT_TOUCHING:
+- (fill in: generated migrations in progress, schema.rb when migrating, etc.)

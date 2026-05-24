@@ -1,0 +1,43 @@
+#AI:1
+# ADR-002: Consolidate Three Templates Into One Canonical Template
+**Status:** Accepted
+**Date:** 2026-04-30
+**Signed:** WH
+
+## Context
+
+Three local folders served the same purpose with overlapping content:
+- `templateRepo_EXAMPLE` — minimalist (4 files: CLAUDE.md, STARTUP_AI, readme_AI, .ai.template); the only one with a GitHub remote
+- `blank-project-scaffold` — generic skeleton (docs/, src/, tests/, ai_modules/nimona_hi_mode.ai); local only, no git history
+- `baseline-template` — opinionated workflow scaffold (Brainstorm→Plan→Execute→Verify rhythm, AI_HANDOFF.ai, WORKSHEET.heywy, ai_context/ package, hi_mode.ai, systematic_debugging.ai); local only, no git history
+
+Maintaining three templates means three places to apply every methodology update. ADR-001's restructuring would need to be applied three times. Any drift between them creates confusion about which to clone.
+
+Correction from initial plan: the original decision proposed working in `baseline-template` and renaming it at the end. Discovered during Phase 0 execution that `baseline-template` and `blank-project-scaffold` are local-only folders with no git history or remote. `templateRepo_EXAMPLE` is already on GitHub — it is the correct and only target.
+
+## Decision
+
+All Phase A work happens directly in `templateRepo_EXAMPLE` (WylieH2S/templateRepo_EXAMPLE on GitHub). At end of Phase A:
+1. Delete `baseline-template` local folder (no git history to lose; content absorbed)
+2. Delete `blank-project-scaffold` local folder (no git history to lose; content absorbed)
+
+No rename needed. The canonical template is already named correctly.
+
+Content absorbed from non-canonical sources during Phase A1:
+- `baseline-template`: full ai_context/ package, AI_HANDOFF.ai, WORKSHEET.heywy, ai_modules/ (hi_mode, systematic_debugging, brainstorming), CURRENT_MISSION.md pattern, init-project.sh
+- `blank-project-scaffold`: docs/project-brief.md and docs/roadmap.md scaffolds
+
+## Alternatives Considered
+
+| Option | Why Rejected |
+|--------|-------------|
+| Keep all three with clear "use this when" docs | Maintenance burden. Any methodology change applied 3×. Docs explaining when to use which is itself a maintenance artifact. |
+| Keep minimalist + opinionated as two distinct templates | Still doubles maintenance. The minimalist template gets outdated fastest because it's the one new users clone first. |
+| Retire all three, build from scratch | Loses battle-tested content from baseline-template. Higher risk. |
+
+## Consequences
+
+- Single source of truth for the template system.
+- ADR-001 restructuring applied once, propagates to all future clones.
+- Destructive op (local folder deletions) requires explicit re-approval at time of execution per HI Mode git safety rules — even though folders are local-only, confirmation is the practice.
+- `templateRepo_EXAMPLE` grows significantly in Phase A1 as baseline-template content is absorbed.

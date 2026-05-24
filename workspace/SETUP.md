@@ -22,14 +22,17 @@ This `workspace/` scaffold is that setup, ready to deploy.
 
 ## Personalization
 
-Two fields need replacing before deploy:
+Replace these before deploy:
 
-| Placeholder | Replace with |
-|-------------|-------------|
-| `WORKSPACE_OWNER` | Your name or org (e.g., `WylieH2S`) |
-| `GITHUB_USERNAME` | Your GitHub handle (e.g., `wylieh2s`) |
+| Placeholder | Files | Replace with |
+|-------------|-------|-------------|
+| `WORKSPACE_OWNER` | All workspace/ files | Your name or org (e.g., `WylieH2S`) |
+| `GITHUB_USERNAME` | `ROSTER.md` | Your GitHub handle (e.g., `wylieh2s`) |
+| `AI_NAME` | `.claude/skills/hi-mode/SKILL.md` | Your AI assistant's name or persona (e.g., `Claude`) |
+| `UNLOCK_PHRASE` | `.claude/skills/hi-mode/SKILL.md` | A phrase the AI echoes to confirm it has read the rules |
+| `OWNER_NAME` | `.claude/skills/hi-mode/SKILL.md` | Your name or handle |
 
-Find-and-replace across all files in this directory:
+Bulk find-and-replace for WORKSPACE_OWNER and GITHUB_USERNAME:
 
 ```bash
 # macOS/BSD
@@ -40,6 +43,8 @@ grep -rl "WORKSPACE_OWNER\|GITHUB_USERNAME" workspace/ | \
 grep -rl "WORKSPACE_OWNER\|GITHUB_USERNAME" workspace/ | \
   xargs sed -i 's/WORKSPACE_OWNER/YourName/g; s/GITHUB_USERNAME/yourhandle/g'
 ```
+
+Edit `workspace/.claude/skills/hi-mode/SKILL.md` by hand for `AI_NAME`, `OWNER_NAME`, and `UNLOCK_PHRASE` — these are personal choices.
 
 ---
 
@@ -58,7 +63,7 @@ cp workspace/ROSTER.md "$WORKSPACE/"
 mkdir -p "$WORKSPACE/.repo-manager"
 cp workspace/.repo-manager/README.md "$WORKSPACE/.repo-manager/"
 cp workspace/.repo-manager/inbox.md "$WORKSPACE/.repo-manager/"
-cp workspace/.repo-manager/drift_log.chloeai "$WORKSPACE/.repo-manager/"
+cp workspace/.repo-manager/drift_log.ai "$WORKSPACE/.repo-manager/"
 ```
 
 **2. Set up workspace canonical skills:**
@@ -66,25 +71,23 @@ cp workspace/.repo-manager/drift_log.chloeai "$WORKSPACE/.repo-manager/"
 mkdir -p "$WORKSPACE/.claude/skills"
 cp -r .claude/skills/drift-sweep "$WORKSPACE/.claude/skills/"
 cp -r .claude/skills/validate-substrate "$WORKSPACE/.claude/skills/"
+cp -r workspace/.claude/skills/hi-mode "$WORKSPACE/.claude/skills/"
 ```
 
-**3. (Optional) Set up your operating charter:**
+**3. Customize your operating charter:**
 
-`.claude/skills/hi-mode/` is where your **operating charter** lives — a persistent cross-session kernel that tracks zoom level, recommended model/effort, task queue, and context across AI sessions. It is not bundled in the template; you write your own.
+A starter charter is pre-seeded at `.claude/skills/hi-mode/SKILL.md`. Open it and replace the placeholders:
+- `AI_NAME` — your AI assistant's name (e.g., `Claude`, `Copilot`)
+- `OWNER_NAME` — your name or handle
+- `UNLOCK_PHRASE` — a phrase the AI echoes to confirm it has read the rules
+- Delete the `CHANGEME` section when done
 
-```bash
-mkdir -p "$WORKSPACE/.claude/skills/hi-mode"
-# Create SKILL.md here — your operating charter.
-# Define: who you are, your values, a boot sequence, and a HANDOFF LOG section.
-# The boot sequences in CLAUDE.md and AGENTS.md will gracefully skip if absent.
-```
-
-To make it available as a Claude Code slash command:
+To make the charter available as a Claude Code slash command:
 ```bash
 ln -s "$WORKSPACE/.claude/skills/hi-mode" ~/.claude/skills/hi-mode
 ```
 
-**Skip this step if you're getting started** — the workspace and per-repo tools work without it.
+**Skip the slash command link if you don't use Claude Code** — the workspace CLAUDE.md and AGENTS.md boot sequences work with any AI that can read files.
 
 **4. For each project repo, symlink the workspace canonical skills:**
 ```bash
@@ -114,4 +117,6 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet
 | `ROSTER.md` | Repo lifecycle dashboard |
 | `.repo-manager/README.md` | Workspace conventions |
 | `.repo-manager/inbox.md` | Between-session quick capture |
-| `.repo-manager/drift_log.chloeai` | Fleet drift findings journal (starts empty) |
+| `.repo-manager/drift_log.ai` | Fleet drift findings journal (starts empty) |
+| `.claude/skills/hi-mode/SKILL.md` | Starter operating charter (customize with your AI name + unlock phrase) |
+| `.claude/skills/hi-mode/ski_lift_log.ai` | Tooling adoption candidates log (starts empty) |

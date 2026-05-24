@@ -14,32 +14,32 @@ The script detects "template mode" by the presence of `init-project.sh`. In temp
 
 ### Tier 1 (always-loaded) files — must exist:
 - `CLAUDE.md` — path-routing table
-- `STARTUP_AI.chloeai` — boot file (READ_ORDER source of truth)
-- `readme_AI.chloeai` — active threads + latest handoff
-- `ai_context/ai_rules.chloeai` — hard constraints
-- `ai_context/glossary.chloeai` — terminology
+- `STARTUP_AI.ai` — boot file (READ_ORDER source of truth)
+- `readme_AI.ai` — active threads + latest handoff
+- `ai_context/ai_rules.ai` — hard constraints
+- `ai_context/glossary.ai` — terminology
 - `ai_context/START_HERE.md` — file map and conventions
 
 ### ai_modules/ — must exist:
 - `ai_modules/` directory
-- `ai_modules/hi_mode.chloeai` — HI Mode shim
+- `ai_modules/hi_mode.ai` — HI Mode shim
 
 ### EXTENDS path resolution:
-- Reads `EXTENDS=` line from `ai_modules/hi_mode.chloeai`
+- Reads `EXTENDS=` line from `ai_modules/hi_mode.ai`
 - Expands `~` to `$HOME` and confirms the target file exists
 - FAIL in normal mode, WARN in template mode
 
 ### Path-scoped rules — must exist if referenced from CLAUDE.md:
-- `.claude/rules/code.chloeai`
-- `.claude/rules/tests.chloeai`
-- `.claude/rules/ai-context.chloeai`
-- `.claude/rules/docs.chloeai`
+- `.claude/rules/code.ai`
+- `.claude/rules/tests.ai`
+- `.claude/rules/ai-context.ai`
+- `.claude/rules/docs.ai`
 
 ### Hygiene checks:
 - `.gitignore` present
-- `AI_HANDOFF.chloeai` present
+- `AI_HANDOFF.ai` present
 - `WORKSHEET.heywy` present
-- `SIDEQUESTS.chloeai` present
+- `SIDEQUESTS.ai` present
 
 ### Tracked junk:
 - No tracked `.DS_Store` files
@@ -51,12 +51,12 @@ The script detects "template mode" by the presence of `init-project.sh`. In temp
 
 ### Freshness checks (90-day threshold):
 - `ai_context/current_state.md` modified within 90 days
-- `AI_HANDOFF.chloeai` modified within 90 days
-- `readme_AI.chloeai` modified within 90 days
+- `AI_HANDOFF.ai` modified within 90 days
+- `readme_AI.ai` modified within 90 days
 
 ### Size sanity:
-- `AI_HANDOFF.chloeai` ≤ 200 KB (warn above — rotate older entries to archive)
-- `ai_context/current_state.md` ≤ 50 KB (warn above — rotate older deltas to readme_AI_archive.chloeai)
+- `AI_HANDOFF.ai` ≤ 200 KB (warn above — rotate older entries to archive)
+- `ai_context/current_state.md` ≤ 50 KB (warn above — rotate older deltas to readme_AI_archive.ai)
 
 ## How to invoke
 
