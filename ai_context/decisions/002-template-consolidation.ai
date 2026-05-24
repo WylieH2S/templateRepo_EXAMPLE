@@ -8,7 +8,7 @@
 
 Three local folders served the same purpose with overlapping content:
 - `templateRepo_EXAMPLE` — minimalist (4 files: CLAUDE.md, STARTUP_AI, readme_AI, .ai.template); the only one with a GitHub remote
-- `blank-project-scaffold` — generic skeleton (docs/, src/, tests/, ai_modules/nimona_hi_mode.ai); local only, no git history
+- `blank-project-scaffold` — generic skeleton (docs/, src/, tests/, ai_modules/hi_mode.ai); local only, no git history
 - `baseline-template` — opinionated workflow scaffold (Brainstorm→Plan→Execute→Verify rhythm, AI_HANDOFF.ai, WORKSHEET.heywy, ai_context/ package, hi_mode.ai, systematic_debugging.ai); local only, no git history
 
 Maintaining three templates means three places to apply every methodology update. ADR-001's restructuring would need to be applied three times. Any drift between them creates confusion about which to clone.
@@ -17,7 +17,7 @@ Correction from initial plan: the original decision proposed working in `baselin
 
 ## Decision
 
-All Phase A work happens directly in `templateRepo_EXAMPLE` (WylieH2S/templateRepo_EXAMPLE on GitHub). At end of Phase A:
+All Phase A work happens directly in `templateRepo_EXAMPLE` (templateRepo_EXAMPLE on GitHub). At end of Phase A:
 1. Delete `baseline-template` local folder (no git history to lose; content absorbed)
 2. Delete `blank-project-scaffold` local folder (no git history to lose; content absorbed)
 

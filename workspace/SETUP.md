@@ -26,8 +26,8 @@ Replace these before deploy:
 
 | Placeholder | Files | Replace with |
 |-------------|-------|-------------|
-| `WORKSPACE_OWNER` | All workspace/ files | Your name or org (e.g., `WylieH2S`) |
-| `GITHUB_USERNAME` | `ROSTER.md` | Your GitHub handle (e.g., `wylieh2s`) |
+| `WORKSPACE_OWNER` | All workspace/ files | Your name or org (e.g., `YourOrg`) |
+| `GITHUB_USERNAME` | `ROSTER.md` | Your GitHub handle (e.g., `yourhandle`) |
 | `AI_NAME` | `.claude/skills/hi-mode/SKILL.md` | Your AI assistant's name or persona (e.g., `Claude`) |
 | `UNLOCK_PHRASE` | `.claude/skills/hi-mode/SKILL.md` | A phrase the AI echoes to confirm it has read the rules |
 | `OWNER_NAME` | `.claude/skills/hi-mode/SKILL.md` | Your name or handle |

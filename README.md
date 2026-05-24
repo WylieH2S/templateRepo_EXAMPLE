@@ -8,7 +8,7 @@ Canonical project template with the full two-tier AI continuity system, HI Mode 
 
 **Local clone:**
 ```bash
-git clone git@github.com:WylieH2S/templateRepo_EXAMPLE.git MyProject
+git clone <this-repo-url> MyProject
 cd MyProject
 rm -rf .git && git init
 bash init-project.sh

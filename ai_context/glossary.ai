@@ -17,7 +17,7 @@ FILE_TYPES:
             Exception: CLAUDE.md and AGENTS.md are fixed names required by tooling.
 
 ANTI_SYNONYMS:
-- Do not call .ai files "markdown" — they use a custom CHLOEAI header format.
+- Do not call .ai files "markdown" — they use the AI artifact (#AI:1) header format.
 - Do not call WORKSHEET.heywy a "log" — it is the human's input channel.
 - Do not call AI_HANDOFF.ai the "project cartridge" — readme_AI.ai is the cartridge.
 - Do not call ai_context/ files "documentation" — they are AI continuity state.

@@ -7,7 +7,7 @@
 ## Context
 
 HI Mode (High-Integrity operating kernel) defines how the AI behaves: voice, values, git safety, stop-the-line rules, zoom levels, model/effort tiers, session wrap protocol. It lives centrally at:
-  `/Users/jacobhutchison/Documents/Projects/GitHub/.claude/skills/hi-mode/SKILL.md`
+  `~/.claude/skills/hi-mode/SKILL.md`
 
 Each repo also has `ai_modules/hi_mode.ai` — a per-repo personality module. Without a clear contract, these can drift. Central charter updates don't propagate. Per-repo overrides silently override safety rules. Two "HI Modes" with no defined relationship is a coherence risk.
 
@@ -36,7 +36,7 @@ PROJECT_OVERRIDES:
   voice_modifiers:
     - (e.g., "always cite file:line when referencing code", or "none")
   project_non_negotiables:
-    - (e.g., "ADTNode: no retaliation, no outbound attack automation", or "none")
+    - (e.g., "security-scanner: no outbound attack automation", or "none")
 ```
 
 **All repos get HI Mode.** The per-repo shim is mandatory; it signals explicitly that HI Mode is active even when no overrides exist.
@@ -45,7 +45,7 @@ PROJECT_OVERRIDES:
 
 | Option | Why Rejected |
 |--------|-------------|
-| Single global HI Mode, no per-repo file | No way to add project-specific safety rules (e.g., ADTNode's no-attack constraint). |
+| Single global HI Mode, no per-repo file | No way to add project-specific safety rules (e.g., security-scanner's no-attack constraint). |
 | Full fork per repo | Charter drift guaranteed. Safety updates don't propagate. |
 | No central charter; each repo defines its own | Cannot maintain behavioral consistency across 12 repos. |
 

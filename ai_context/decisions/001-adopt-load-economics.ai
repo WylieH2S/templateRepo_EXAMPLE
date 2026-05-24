@@ -54,7 +54,7 @@ Adopt a two-tier load model across all templates and working repos:
 **Load economics pattern — [.context method](https://github.com/andrefigueira/.context) by Andre Figueira:**
 The two-tier split, path-scoped rules via CLAUDE.md table, and instruction-budget discipline are adapted from the .context method. The research citations above are from .context's research.md. Used under MIT license; methodology adapted (not copied) to our naming conventions and operational layer.
 
-**Operational kernel layer — our own work (Wylie Hutchison + Claude):**
+**Operational kernel layer — our own work (the original authors):**
 The HI Mode charter (voice, values, stop-the-line, design review gate, HANDOFF protocol, zoom levels, model/effort tiers), the .ai/.heywy naming convention, and the THREADS/HANDOFF_LOG continuity cartridge architecture are original to this system. The .context method has no equivalent — their "AI rules" govern generated code, not AI operating behavior.
 
 **Skills system + workflow patterns — [superpowers](https://github.com/obra/superpowers) by Jesse Vincent:**

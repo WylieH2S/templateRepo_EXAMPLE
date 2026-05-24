@@ -34,7 +34,7 @@ Handles both `.chloeai` (existing repos) and `.ai` (template-based repos) cartri
 ## Output example
 
 ```
-[PocketLink]  2026-05-21 | SESSION-CARE-FEEDBACK-MERGED
+[MyProject]  2026-05-24 | SESSION-001
   zoom=TACTICAL  model=sonnet  effort=medium
   reason: Wy live-tested the care feedback build...
   • [sonnet] Choose the next core-mechanics slice from main

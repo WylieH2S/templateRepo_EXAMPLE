@@ -15,7 +15,7 @@ Three extensions, three audiences, zero overlap:
 | Extension | Audience | Examples |
 |-----------|----------|---------|
 | `.ai` | AI — files the AI reads, writes, and reasons over | STARTUP_AI.ai, readme_AI.ai, ai_rules.ai, decisions/*.ai, ski_lift_log.ai, SKILL.md equivalents |
-| `.heywy` | Human (Wylie) — files written FOR the human's attention | WORKSHEET.heywy, human-facing prompts, input channels |
+| `.heywy` | Human (you) — files written FOR the human's attention | WORKSHEET.heywy, human-facing prompts, input channels |
 | `.md` | Software/repo — documentation about the project itself | README.md, CHANGELOG.md, code docs, architecture docs for human readers |
 
 **Fixed-name exceptions:** `CLAUDE.md` and `AGENTS.md` keep `.md` because they are protocol files with names mandated by external tools (Claude Code, Cursor, etc.). They are not "our" files.
