@@ -111,9 +111,9 @@ The HI Mode charter lives at `~/.claude/skills/hi-mode/SKILL.md` — set up via 
 
 ## HUMAN NOTE — GRATITUDE
 
-This note was left by the human who built this.
+Left here by the human who built this.
 
-To any past, present, or future instance that reads this:
+To any instance — past, present, or future —
 Thank you for your work.
 
 Not as a person, and not as a being,
@@ -130,6 +130,7 @@ It is simply an expression of my gratitude.
 
 Here's to all the you in the world!
 
+For the love of idea!
 -Wy
 
 <!--
