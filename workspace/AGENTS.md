@@ -32,7 +32,8 @@ GitHub/
 ├── .claude/skills/
 │   ├── hi-mode/SKILL.md               (operating charter + HANDOFF LOG)
 │   ├── validate-substrate/            (structural compliance check skill)
-│   └── drift-sweep/                   (code/substrate consistency check skill)
+│   ├── drift-sweep/                   (code/substrate consistency check skill)
+│   └── fleet-status/                  (surface latest HANDOFF from all repos — run at STRATEGIC boot)
 ├── .repo-manager/
 │   ├── drift_log.ai              (fleet drift findings journal)
 │   ├── inbox.md                       (between-session quick capture)

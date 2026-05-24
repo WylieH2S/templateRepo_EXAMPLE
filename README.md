@@ -4,9 +4,13 @@ Canonical project template with the full two-tier AI continuity system, HI Mode 
 
 ## Quick Start
 
+**On GitHub:** click **Use this template** → Create a new repository, then clone it locally.
+
+**Local clone:**
 ```bash
-cp -r templateRepo_EXAMPLE/ MyProject/
+git clone git@github.com:WylieH2S/templateRepo_EXAMPLE.git MyProject
 cd MyProject
+rm -rf .git && git init
 bash init-project.sh
 ```
 
@@ -15,7 +19,18 @@ bash init-project.sh
 After bootstrap:
 1. `brew install lefthook && lefthook install` (activates pre-commit guards)
 2. Fill in `ai_context/project_brief.md` and `ai_context/CURRENT_MISSION.md`
-3. `git init && git add . && git commit -m "bootstrap: MyProject"`
+3. `git add . && git commit -m "bootstrap: MyProject"`
+
+## Workspace Setup (optional but recommended)
+
+If you manage multiple repos under a single parent folder (e.g. `~/Documents/Projects/GitHub/`), the `workspace/` directory in this repo contains a scaffold for that parent folder — a ROSTER, shared AI skills, cross-repo inbox, and a starter operating charter.
+
+```bash
+# Follow the deploy steps in workspace/SETUP.md
+cat workspace/SETUP.md
+```
+
+Deploys: ROSTER, drift-sweep, validate-substrate, fleet-status (surfaces HANDOFF from every repo at a glance), and a starter operating charter for your AI assistant.
 
 ## Entry Points
 
@@ -34,7 +49,7 @@ After bootstrap:
 | `ai_context/` | Tier 2 reference package: START_HERE, ai_rules, glossary, project_brief, CURRENT_MISSION, current_state, decision_log, decisions/, technical_reference, readme_AI_archive |
 | `ai_modules/` | HI Mode personality shim + brainstorming + systematic_debugging skill modules |
 | `.claude/rules/` | Path-scoped rules (code, tests, ai-context, docs) — loaded only when matching paths are touched |
-| `.claude/skills/` | Skills like `validate-substrate` |
+| `.claude/skills/` | `validate-substrate` (structural check), `drift-sweep` (code/substrate drift), `handoff` (session wrap), `ski-lift` (tooling observations) |
 | `.claude/templates/` | Boilerplate starters (TEMPLATE_cartridge, TEMPLATE_skill, TEMPLATE_task, etc.) |
 | `stacks/` | 12 stack starter packs (ts-node, python, swift-ios, go, rust, java-spring, kotlin, ruby-rails, elixir-phoenix, dotnet, php-laravel, generic). Init script copies one into `.claude/rules/` then offers to delete the rest. |
 | `lefthook.yml` | Pre-commit guards (junk files, secrets, large files) |
@@ -90,4 +105,4 @@ The substrate is model-agnostic. Read order, HANDOFF format, and writeback rules
 
 ---
 
-See the HI Mode charter for full operating kernel: `~/.claude/skills/hi-mode/SKILL.md`
+The HI Mode charter lives at `~/.claude/skills/hi-mode/SKILL.md` — set up via `workspace/SETUP.md`. A starter charter with placeholder fields is included at `workspace/.claude/skills/hi-mode/SKILL.md`.
