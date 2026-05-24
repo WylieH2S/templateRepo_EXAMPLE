@@ -27,7 +27,7 @@ signature="AI name | model | focus mode | timestamp range"
 NOTES:
 - This file is a conversation journal, not the main project cartridge
 - `readme_AI.ai` and the `ai_context/` package remain authoritative for project state
-- `WORKSHEET.heywy` remains {{OWNER_NAME}}'s human input channel
+- `WORKSHEET.human` remains {{OWNER_NAME}}'s human input channel
 
 ---
 

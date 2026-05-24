@@ -60,7 +60,7 @@ Each subdirectory is its own git repo with its own substrate. This parent holds 
 ## What MAY grow here later
 
 - `ai_context/` — if cross-cutting decisions accumulate (e.g., decisions affecting *all* repos)
-- `WORKSHEET.heywy` — if a cross-repo input channel is needed beyond the HI Mode HANDOFF LOG
+- `WORKSHEET.human` — if a cross-repo input channel is needed beyond the HI Mode HANDOFF LOG
 - `readme_AI.ai` — if active cross-cutting threads need a dedicated cartridge
 
 ## Non-negotiables

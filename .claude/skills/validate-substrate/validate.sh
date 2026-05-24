@@ -89,7 +89,7 @@ done
 section "Hygiene"
 [ -f .gitignore ] && pass ".gitignore" || fail ".gitignore (missing)"
 [ -f AI_HANDOFF.ai ] && pass "AI_HANDOFF.ai" || warn "AI_HANDOFF.ai (missing — OK for very new repos)"
-[ -f WORKSHEET.heywy ] && pass "WORKSHEET.heywy" || warn "WORKSHEET.heywy (missing)"
+[ -f WORKSHEET.human ] && pass "WORKSHEET.human" || warn "WORKSHEET.human (missing)"
 [ -f SIDEQUESTS.ai ] && pass "SIDEQUESTS.ai" || warn "SIDEQUESTS.ai (missing)"
 
 # ── Tracked junk ──────────────────────────────────────────────

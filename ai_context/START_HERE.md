@@ -17,7 +17,7 @@ The order STARTUP_AI specifies (for context):
 5. `ai_context/project_brief.md` — what the project IS
 6. `ai_context/CURRENT_MISSION.md` — active scope, stop conditions
 7. `ai_context/current_state.md` — version, status, open items
-8. `WORKSHEET.heywy` — human input channel
+8. `WORKSHEET.human` — human input channel
 9. `AI_HANDOFF.ai` — last 2–3 session entries
 
 After boot: echo the unlock phrase, list THREADS, list ASSUMPTIONS, restate the current mission in one sentence, check for new human input.
@@ -56,7 +56,7 @@ Before choosing any work:
 |------|---------|-------|
 | `readme_AI.ai` | Entry point -- points here. | Lean pointer, not the cartridge |
 | `STARTUP_AI.ai` | Tool-agnostic boot file. | Read by any AI; defines READ_ORDER |
-| `WORKSHEET.heywy` | {{OWNER_NAME}}'s input channel. Test reports, answers, notes. | Check every session. Move handled items to HISTORY. |
+| `WORKSHEET.human` | {{OWNER_NAME}}'s input channel. Test reports, answers, notes. | Check every session. Move handled items to HISTORY. |
 | `AI_HANDOFF.ai` | Shared AI-to-AI session journal. Append-only. | Add an entry when your session materially changes code or direction |
 | `SIDEQUESTS.ai` | Cross-project parked-idea bank. | Drop ideas that came up but don't belong to this project |
 | `CLAUDE.md` | Claude Code auto-read project instructions. | Auto-loaded by Claude Code; other AIs read manually |
@@ -86,7 +86,7 @@ Loaded on demand when matching paths are touched. Fill in for your project.
 Two custom file types exist in this project:
 
 - **`.ai`** -- AI-facing: memory, state, decisions, experiments. Source of truth for AI continuity.
-- **`.heywy`** -- Human-facing: worksheets, test reports, Q&A. {{OWNER_NAME}}'s input channel.
+- **`.human`** -- Human-facing: worksheets, test reports, Q&A. {{OWNER_NAME}}'s input channel.
 
 Any AI reading this repo should recognize both file types.
 
@@ -121,7 +121,7 @@ Also update `current_state.md` in this folder if the version, status, or open it
 
 ## Who is {{OWNER_NAME}}?
 
-The project owner, product manager, and final decision-maker. Sets direction, priorities, constraints, and acceptance criteria. Tests and reports results in `WORKSHEET.heywy`.
+The project owner, product manager, and final decision-maker. Sets direction, priorities, constraints, and acceptance criteria. Tests and reports results in `WORKSHEET.human`.
 
 Preferences:
 <!-- Replace with project-specific preferences. Examples:

@@ -23,14 +23,14 @@ TYPE="welcome"
 #     ai_context/current_state.md -- Version, status, open items.
 #     AI_HANDOFF.ai (repo root) -- Cross-AI session journal.
 #
-# .heywy  -- HUMAN-FACING files
+# .human  -- HUMAN-FACING files
 #   Purpose: Worksheets, test reports, Q&A, feedback, notes
 #   Who writes: The human ({{OWNER_NAME}})
 #   Who reads: AI (every session start)
 #   Think of it as: A worksheet the teacher hands the student.
 #     The human fills it in. You read it and act on it.
 #   Key files:
-#     WORKSHEET.heywy (project root) -- Primary human input channel.
+#     WORKSHEET.human (project root) -- Primary human input channel.
 #
 # Other project files:
 #   CLAUDE.md -- Claude Code session instructions (auto-loaded by Claude Code)
@@ -44,7 +44,7 @@ TYPE="welcome"
 #    - Follow the boot sequence. It tells you what to read and in what order.
 #    - Points to project brief, technical reference, and current state.
 #
-# 2. Read WORKSHEET.heywy (project root)
+# 2. Read WORKSHEET.human (project root)
 #    - Check for new test reports, answered questions, or notes from {{OWNER_NAME}}.
 #    - Act on anything new. Move handled items to HISTORY section.
 #
@@ -78,18 +78,18 @@ TYPE="welcome"
 # ============================================================
 #
 # Async (between sessions):
-#   Human writes in .heywy  -->  AI reads at session start
+#   Human writes in .human  -->  AI reads at session start
 #   AI writes in .ai   -->  AI reads at next session start
-#   AI updates WORKSHEET.heywy questions section --> Human answers
+#   AI updates WORKSHEET.human questions section --> Human answers
 #
 # Sync (during session):
 #   Normal conversation. Ask questions directly.
 #   If you need input but can keep working, add the question to
-#   WORKSHEET.heywy and tell the human "I need input in the worksheet."
+#   WORKSHEET.human and tell the human "I need input in the worksheet."
 #
 # The human should never need to read .ai files.
 # The AI should never need the human to read .ai files.
-# .heywy is the bridge.
+# .human is the bridge.
 
 # ============================================================
 # WRITEBACK RULES
@@ -98,7 +98,7 @@ TYPE="welcome"
 # When something changes that affects future correctness:
 #   - Update ai_context/current_state.md (version, status, open items)
 #   - Append to AI_HANDOFF.ai (session journal entry)
-#   - Update WORKSHEET.heywy version header
+#   - Update WORKSHEET.human version header
 #
 # Failed experiments MUST be logged with:
 #   - What changed
@@ -114,7 +114,7 @@ TYPE="welcome"
 # ============================================================
 #
 # [ ] Read ai_context/START_HERE.md (follow boot sequence)
-# [ ] Read WORKSHEET.heywy
+# [ ] Read WORKSHEET.human
 # [ ] Skim AI_HANDOFF.ai (last 2-3 entries)
 # [ ] Echo unlock phrase
 # [ ] List threads and assumptions

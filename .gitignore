@@ -78,4 +78,4 @@ test-results/
 
 # AI session ephemera (kept locally, never pushed)
 .ai-scratch/
-WORKSHEET.heywy.backup
+WORKSHEET.human.backup

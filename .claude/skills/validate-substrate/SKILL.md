@@ -38,7 +38,7 @@ The script detects "template mode" by the presence of `init-project.sh`. In temp
 ### Hygiene checks:
 - `.gitignore` present
 - `AI_HANDOFF.ai` present
-- `WORKSHEET.heywy` present
+- `WORKSHEET.human` present
 - `SIDEQUESTS.ai` present
 
 ### Tracked junk:

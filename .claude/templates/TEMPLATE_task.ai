@@ -98,14 +98,14 @@ VERSION_TARGET=""  # Which version should this land in?
 # ============================================================
 #
 # What needs to be tested? How?
-# The human fills in results in WORKSHEET.heywy after testing.
+# The human fills in results in WORKSHEET.human after testing.
 #
 # TEST PLAN:
 #   - [ ]
 #   - [ ]
 #
 # WORKSHEET REFERENCE:
-#   (AI adds pointer to WORKSHEET.heywy test report section)
+#   (AI adds pointer to WORKSHEET.human test report section)
 
 # ============================================================
 # RESULT

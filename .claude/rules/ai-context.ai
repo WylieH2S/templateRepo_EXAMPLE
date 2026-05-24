@@ -1,6 +1,6 @@
 #AI:1
 TYPE="path_rules"
-GLOB="ai_context/**, ai_modules/**, readme_AI.ai, AI_HANDOFF.ai, WORKSHEET.heywy, SIDEQUESTS.ai"
+GLOB="ai_context/**, ai_modules/**, readme_AI.ai, AI_HANDOFF.ai, WORKSHEET.human, SIDEQUESTS.ai"
 
 PURPOSE:
 Rules active when editing AI continuity files. Loaded on demand when these
@@ -9,7 +9,7 @@ paths are touched. These rules protect continuity integrity across sessions.
 ---
 
 IMMUTABLE_RULES:
-- Append only. Do not rewrite history in any .ai or .heywy file.
+- Append only. Do not rewrite history in any .ai or .human file.
 - Do not modify USAGE or STATE sections of readme_AI.ai unless explicitly instructed.
 - Do not delete entries from AI_HANDOFF.ai — move oldest to HANDOFF_ARCHIVE section if needed.
 - Do not delete entries from ai_context/decision_log.md — mark SUPERSEDED instead.
@@ -34,7 +34,7 @@ WRITEBACK_TARGETS:
 - Decisions made → ai_context/decision_log.md (in-effect) + ai_context/readme_AI_archive.ai DECISIONS (finalized)
 - Project state changes → ai_context/current_state.md
 - Session end → AI_HANDOFF.ai (append new SESSION-N block)
-- Human input handled → WORKSHEET.heywy (move to HISTORY section, do not delete)
+- Human input handled → WORKSHEET.human (move to HISTORY section, do not delete)
 - Cross-project parked ideas → SIDEQUESTS.ai (status: parked|active|shipped|dropped)
 
 ---
@@ -81,7 +81,7 @@ Promote a sidequest to a THR when it has a concrete owner, scope, and acceptance
 
 FILE_TYPE_REMINDER:
 - .ai — AI-facing. Human should not need to read these. Exception: readme_AI.ai is the project cartridge.
-- .heywy — Human-facing. AI reads but does not own direction. WORKSHEET.heywy is the human input channel.
+- .human — Human-facing. AI reads but does not own direction. WORKSHEET.human is the human input channel.
 
 ---
 

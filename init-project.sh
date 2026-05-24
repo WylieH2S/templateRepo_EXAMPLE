@@ -127,7 +127,7 @@ while IFS= read -r -d '' f; do
 done < <(
   find . \
     -type f \
-    \( -name "*.md" -o -name "*.ai" -o -name "*.heywy" -o -name "*.sh" \) \
+    \( -name "*.md" -o -name "*.ai" -o -name "*.human" -o -name "*.sh" \) \
     ! -name "init-project.sh" \
     ! -path "./.git/*" \
     ! -path "./stacks/*" \

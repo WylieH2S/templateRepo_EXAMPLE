@@ -50,7 +50,7 @@ What this means going forward. What becomes easier. What becomes harder.
 | [001](001-adopt-load-economics.ai) | Adopt Two-Tier Load Economics for AI Documentation | Accepted |
 | [002](002-template-consolidation.ai) | Consolidate Three Templates Into One Canonical Template | Accepted |
 | [003](003-two-layer-hi-mode.ai) | Two-Layer HI Mode: Central Charter + Per-Repo Extension | Accepted |
-| [004](004-naming-convention.ai) | File Extension Convention: .ai / .heywy / .md | Accepted |
+| [004](004-naming-convention.ai) | File Extension Convention: .ai / .human / .md | Accepted |
 | [005](005-ai_context-not-dotcontext.ai) | Use ai_context/ Over .context/ | Accepted |
 | [006](006-ship-all-stacks.ai) | Ship All Stack Starter Packs in Template | Accepted |
 | [007](007-ski-lift-mechanism.ai) | Formalize Ski-Lift Tooling Intelligence Mechanism | Accepted |

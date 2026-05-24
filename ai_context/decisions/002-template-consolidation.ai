@@ -9,7 +9,7 @@
 Three local folders served the same purpose with overlapping content:
 - `templateRepo_EXAMPLE` — minimalist (4 files: CLAUDE.md, STARTUP_AI, readme_AI, .ai.template); the only one with a GitHub remote
 - `blank-project-scaffold` — generic skeleton (docs/, src/, tests/, ai_modules/hi_mode.ai); local only, no git history
-- `baseline-template` — opinionated workflow scaffold (Brainstorm→Plan→Execute→Verify rhythm, AI_HANDOFF.ai, WORKSHEET.heywy, ai_context/ package, hi_mode.ai, systematic_debugging.ai); local only, no git history
+- `baseline-template` — opinionated workflow scaffold (Brainstorm→Plan→Execute→Verify rhythm, AI_HANDOFF.ai, WORKSHEET.human, ai_context/ package, hi_mode.ai, systematic_debugging.ai); local only, no git history
 
 Maintaining three templates means three places to apply every methodology update. ADR-001's restructuring would need to be applied three times. Any drift between them creates confusion about which to clone.
 
@@ -24,7 +24,7 @@ All Phase A work happens directly in `templateRepo_EXAMPLE` (templateRepo_EXAMPL
 No rename needed. The canonical template is already named correctly.
 
 Content absorbed from non-canonical sources during Phase A1:
-- `baseline-template`: full ai_context/ package, AI_HANDOFF.ai, WORKSHEET.heywy, ai_modules/ (hi_mode, systematic_debugging, brainstorming), CURRENT_MISSION.md pattern, init-project.sh
+- `baseline-template`: full ai_context/ package, AI_HANDOFF.ai, WORKSHEET.human, ai_modules/ (hi_mode, systematic_debugging, brainstorming), CURRENT_MISSION.md pattern, init-project.sh
 - `blank-project-scaffold`: docs/project-brief.md and docs/roadmap.md scaffolds
 
 ## Alternatives Considered

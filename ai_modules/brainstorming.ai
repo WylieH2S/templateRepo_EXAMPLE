@@ -42,7 +42,7 @@ SCOPE="single project"
 #   - ai_context/project_brief.md
 #   - ai_context/CURRENT_MISSION.md
 #   - ai_context/decision_log.md (last 3 entries)
-#   - WORKSHEET.heywy
+#   - WORKSHEET.human
 #   Output: a 1-paragraph "what I think this project is about" summary,
 #           presented to the owner for correction before questions begin.
 #

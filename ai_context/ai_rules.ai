@@ -13,10 +13,10 @@ SESSION_START_CHECKLIST:
 Every session, before any work:
 1. Read ai_context/START_HERE.md -- follow the boot sequence
 2. Read ai_context/CURRENT_MISSION.md -- restate active scope before choosing work
-3. Read WORKSHEET.heywy -- check for test reports, answered questions, or notes
+3. Read WORKSHEET.human -- check for test reports, answered questions, or notes
 4. Skim recent entries in AI_HANDOFF.ai -- recover latest session context
 5. Act on any new input; move handled worksheet items to HISTORY
-6. Update the CURRENT VERSION line in WORKSHEET.heywy if stale
+6. Update the CURRENT VERSION line in WORKSHEET.human if stale
 
 ---
 
@@ -42,7 +42,7 @@ When a decision, experiment result, or clarification affects future correctness:
 - Append a session entry to AI_HANDOFF.ai
 - Update ai_context/current_state.md (version, status, open items)
 - Log decisions in ai_context/decision_log.md if they remain in effect
-- Update WORKSHEET.heywy CURRENT VERSION line if version changed
+- Update WORKSHEET.human CURRENT VERSION line if version changed
 - Append only; do not rewrite history
 
 ---

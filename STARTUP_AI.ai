@@ -26,7 +26,7 @@ READ_ORDER:
 5 `ai_context/project_brief.md`        -- what this project IS
 6 `ai_context/CURRENT_MISSION.md`      -- active scope, stop conditions, task contract
 7 `ai_context/current_state.md`        -- current version, status, open items
-8 `WORKSHEET.heywy`                    -- check for new human input
+8 `WORKSHEET.human`                    -- check for new human input
 9 `AI_HANDOFF.ai`                 -- last 2-3 session entries
 
 AUTHORITY_ORDER:
