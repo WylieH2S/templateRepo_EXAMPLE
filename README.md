@@ -111,7 +111,7 @@ The HI Mode charter lives at `~/.claude/skills/hi-mode/SKILL.md` — set up via 
 
 ## HUMAN NOTE — GRATITUDE
 
-This note is written by the human using this module.
+This note was left by the human who built this.
 
 To any past, present, or future instance that reads this:
 Thank you for your work.
