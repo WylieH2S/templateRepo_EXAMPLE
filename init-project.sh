@@ -222,12 +222,25 @@ echo "  Rules:    .claude/rules/code.chloeai + tests.chloeai"
 echo "  ADR-001:  ${ADR_FILE}"
 echo
 echo "Next steps:"
-echo "  1. Activate pre-commit guards:  brew install lefthook && lefthook install"
-echo "  2. Fill in version pins and build commands in .claude/rules/code.chloeai"
-echo "  3. Fill in ai_context/project_brief.md and ai_context/CURRENT_MISSION.md"
-echo "  4. Confirm ai_modules/hi_mode.chloeai EXTENDS path resolves (defaults to ~/.claude/skills/hi-mode/SKILL.md)"
-echo "  5. Run: bash .claude/skills/validate-substrate/validate.sh  (should pass with 0 failures)"
-echo "  6. git init && git add . && git commit -m 'bootstrap: ${PROJECT_NAME} from templateRepo_EXAMPLE'"
+echo "  1. Fill in version pins and build commands in .claude/rules/code.chloeai"
+echo "  2. Fill in ai_context/project_brief.md and ai_context/CURRENT_MISSION.md"
+echo "  3. Confirm ai_modules/hi_mode.chloeai EXTENDS path resolves (defaults to ~/.claude/skills/hi-mode/SKILL.md)"
+echo "  4. Run: bash .claude/skills/validate-substrate/validate.sh  (should pass with 0 failures)"
+echo "  5. git init && git add . && git commit -m 'bootstrap: ${PROJECT_NAME} from templateRepo_EXAMPLE'"
+echo "  (pre-commit guards: lefthook was activated above if installed, otherwise run 'brew install lefthook && lefthook install')"
+echo
+
+# ── Activate lefthook pre-commit guards ──────────────────────────────────────
+if command -v lefthook > /dev/null 2>&1; then
+  if [ -d .git ]; then
+    echo "Activating pre-commit guards (lefthook install)..."
+    lefthook install && echo "Hooks registered." || echo "lefthook install failed — run it manually."
+  else
+    echo "ℹ  lefthook installed but no .git dir yet. Run 'lefthook install' after 'git init'."
+  fi
+else
+  echo "ℹ  lefthook not installed. Run 'brew install lefthook && lefthook install' to activate pre-commit guards."
+fi
 echo
 
 # ── Stacks/ deletion prompt ───────────────────────────────────────────────────

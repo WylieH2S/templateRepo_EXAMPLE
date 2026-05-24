@@ -48,6 +48,13 @@ pre-commit:
           exit 1
         fi
 
+    # Drift sweep — catches probe journals in file headers, untracked audit docs,
+    # and uncommitted churn before it accumulates into hard-to-review bulk.
+    # Gated subset: working-tree, untracked-docs, file-journals (fast, no triage needed).
+    # Orphans and mission-freshness are advisory only — run full sweep manually to review.
+    drift-sweep:
+      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals
+
     # Warn on direct main commits (override with --no-verify if intentional)
     not-on-main:
       run: |

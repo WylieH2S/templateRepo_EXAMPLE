@@ -95,6 +95,11 @@ Exit code: 0 if no failures, 1 if any FAIL, 2 if cannot enter target repo.
 - **At session start** when working tree is dirty
 - **After a probe iteration's live test** lands a result — confirms the result was committed and no defensive code was left behind
 - **As part of periodic cross-repo audits** (use `--json` for pipeable output; `--fail-on=working-tree,untracked-docs,file-journals` for a quick no-triage pre-commit gate)
+- **Optional — after every Claude Code turn:** add a `Stop` hook to `.claude/settings.json` that reports drift state at session end:
+  ```json
+  {"hooks": {"Stop": [{"matcher": "", "hooks": [{"type": "command",
+    "command": "bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals"}]}]}}
+  ```
 
 ## Versions
 

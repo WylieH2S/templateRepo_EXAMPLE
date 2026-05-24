@@ -54,6 +54,19 @@ jobs:
           fi
           echo "OK — no oversized files"
 
+  drift-sweep:
+    name: Drift Sweep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Drift sweep (file-journals + cruft gate; orphans and freshness advisory)
+        run: |
+          # Gates: committed code must have no probe-journal headers and no cruft dirs.
+          # Orphans and mission-freshness are reported but do not fail the job
+          # (they require human triage — see drift-sweep SKILL.md).
+          bash .claude/skills/drift-sweep/sweep.sh --fail-on=file-journals,cruft
+
   substrate-validation:
     name: Substrate Validation
     runs-on: ubuntu-latest

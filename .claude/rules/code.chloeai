@@ -31,3 +31,10 @@ FORBIDDEN_PATTERNS:
 EXPLICITLY_NOT_TOUCHING:
 ; Files or modules that are off-limits unless CURRENT_MISSION.md says otherwise.
 - (fill in)
+
+ANTI_DRIFT_RULES:
+; drift-sweep enforces these automatically on pre-commit and CI.
+- Remove orphaned exports (functions, consts, classes with zero cross-file callers) when a subsystem is stripped or refactored. Dead runtime code is a maintenance liability. Use ORPHAN_EXPORT_ALLOWLIST in .claude/drift-sweep.conf for legitimate exceptions (e.g. exports used only via dynamic access or by tests via side-effects).
+- Do not accumulate version-bump comments (// v0.9.x, # v1.2.3) in file headers across probe iterations. Move iteration notes to ai_context/. Threshold: >5 version-bump lines in first 80 lines triggers a drift-sweep FAIL.
+- Do not track files under old/, testing/, or *_backup*/ directories. git history is the archive; these directories are drift.
+- Commit after each probe iteration, not after multiple. Keep uncommitted diff under 1000 lines. Accumulation across iterations makes each commit unreviable and increases the cost of a mistake.

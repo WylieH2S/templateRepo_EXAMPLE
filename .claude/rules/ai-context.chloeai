@@ -85,6 +85,15 @@ FILE_TYPE_REMINDER:
 
 ---
 
+SUBSTRATE_CODE_CONSISTENCY:
+; drift-sweep's mission-freshness check enforces the time thresholds below.
+- When code changes direction, update ai_context/CURRENT_MISSION.md before the next session. Substrate describes intent; code describes implementation. They must not diverge for more than MISSION_STALE_DAYS (default 14).
+- When a THREAD closes or is superseded, update its status in readme_AI.chloeai immediately. Ghost threads (open status on completed work) are substrate drift.
+- After a probe cycle, capture findings in RECENT_EXPERIMENTS or decision_log.md before ending the session. Findings left only in code comments rot when the surrounding code changes.
+- If code was touched and substrate was not, that is expected. If substrate was updated without corresponding code change, verify the substrate reflects current code reality — do not update substrate to match a plan that was not executed.
+
+---
+
 NON_NEGOTIABLES:
 - Continuity files are the source of truth for what's been tried, decided, and built.
   Do not act on assumptions when continuity files have the answer — read them first.
