@@ -1,0 +1,23 @@
+#{{AIHEADER}}:1
+TYPE="stack_meta"
+STACK="ts-node"
+DISPLAY_NAME="TypeScript / Node.js"
+
+DESCRIPTION:
+Server-side or fullstack TypeScript on Node.js LTS. Works for REST APIs,
+CLI tools, background workers, and fullstack frameworks (Next.js, Remix, etc.).
+
+RECOMMENDED_TOOLS:
+- Runtime:       Node.js 20 LTS
+- Package mgr:   pnpm (preferred) or npm
+- TypeScript:    tsc (compiler), tsx (dev runner)
+- Bundler:       esbuild or vite (if bundling needed)
+- Linter:        ESLint + @typescript-eslint
+- Formatter:     Prettier
+- Test:          Vitest (preferred) or Jest
+- Type check:    tsc --noEmit in CI
+
+INIT_NOTES:
+- init-project.sh copies code.{{AI}}ai → .claude/rules/code.{{AI}}ai
+- init-project.sh copies tests.{{AI}}ai → .claude/rules/tests.{{AI}}ai
+- Fill in LANGUAGE_RUNTIME with Node version pin before first session

@@ -1,0 +1,33 @@
+#{{AIHEADER}}:1
+TYPE="path_rules"
+GLOB="src/**, include/**"
+
+LANGUAGE_RUNTIME:
+- C99 dialect via SDCC compiler (Small Device C Compiler)
+- GBDK-2020 fork (https://github.com/gbdk-2020/gbdk-2020) — pin version in Makefile (e.g., "4.2.0")
+- Target hardware: Game Boy (DMG), Game Boy Color (CGB), Game Boy Advance (AGB) — declare target in build flags
+
+BUILD:
+- make (Makefile drives lcc → SDCC → linker → ROM output)
+- Output: .gb or .gbc ROM file in build/ or bin/
+- Type-check / lint: SDCC warnings should be zero — treat warnings as errors via -Werror equivalent
+- Sanity-check ROM size: Game Boy cartridges have hard limits (32 KB MBC0, up to 8 MB MBC5)
+
+STYLE_CONVENTIONS:
+- File extension: .c for source, .h for headers
+- Use uint8_t / uint16_t (from stdint.h) — not int (16-bit on Game Boy, surprising)
+- Sprite/tile data lives in src/data/ or assets/ as binary or PNG → tile converter
+- Bank organization: declare with #pragma bank N — overflow across banks is silent corruption
+- Use BANKREF + BANKREF_EXTERN for cross-bank function calls
+
+FORBIDDEN_PATTERNS:
+- No floating point — Game Boy has no FPU, SDCC emulates via huge software routines
+- No malloc/free — there is no heap; use static buffers
+- No printf in shipping code — bloats ROM massively (use display_text or sprite-based UI)
+- No int without explicit size — assume 16-bit unless you know
+- No global variables in WRAM without bank declaration
+- No standard library calls outside of <gb/gb.h>, <gb/cgb.h>, and explicit GBDK headers
+
+EXPLICITLY_NOT_TOUCHING:
+- (fill in: generated tile data, sound bank assemblies, vendored GBDK headers, etc.)
+- build/ output — regenerate from source

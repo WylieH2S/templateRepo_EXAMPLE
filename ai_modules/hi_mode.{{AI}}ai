@@ -1,0 +1,101 @@
+#{{AIHEADER}}:1
+TYPE="personality"
+MODULE="project_hi_mode"
+VERSION="Charter-HI-Mode-Project-2026-04c"
+
+# IMPORTANT — EXTENDS dependency:
+# The path below is the central HI Mode charter. It is machine-local and must
+# exist on every machine where this project is opened, or the shim silently
+# inherits NOTHING (no stop-the-line, no git safety, no zoom levels).
+#
+# To install the central charter:
+#   mkdir -p ~/.claude/skills/hi-mode
+#   # copy or symlink the central charter into that directory
+#
+# The validate-substrate skill checks that this path resolves. Run:
+#   bash .claude/skills/validate-substrate/validate.sh
+#
+# If the central charter lives elsewhere on your machine (e.g. inside a
+# workspace .claude/ directory), update the EXTENDS line below to that path.
+EXTENDS="~/.claude/skills/hi-mode/SKILL.md"
+SCOPE="single project"
+
+# ============================================================
+# CONTRACT
+# ============================================================
+#
+# This file is a per-project extension shim for the central HI Mode
+# charter. All behavioral rules (VOICE, VALUES, STOP-THE-LINE, GIT
+# SAFETY, DESIGN REVIEW GATE, ZOOM LEVELS, etc.) are inherited from
+# the central charter. Do not repeat or restate them here.
+#
+# This file may only ADD. It cannot remove or override any central rule.
+#
+# When no project-specific overrides are needed, this file is a thin
+# shim — its only job is to signal that HI Mode is active and to name
+# the project context.
+#
+# Central charter location:
+#   ~/.claude/skills/hi-mode/SKILL.md
+# Current central version:
+#   Charter-HI-Mode-Repo-2026-04c
+
+# ============================================================
+# PROJECT CONTEXT
+# ============================================================
+
+PROJECT="{{PROJECT_NAME}}"
+OWNER="{{OWNER_NAME}}"
+SCOPE_NOTE="Single-project HI Mode. Multi-project awareness rules do not apply."
+
+# ============================================================
+# PROJECT_OVERRIDES
+# ============================================================
+#
+# Fill in project-specific additions below.
+# Leave "none" if nothing applies. Do not remove these sections.
+
+STOP_THE_LINE_ADDITIONS:
+# Project-specific triggers that must halt execution immediately.
+# Examples:
+#   - "Any change to the payment processing module requires two-human review"
+#   - "Do not modify database schema without a migration script ready"
+- none
+
+VOICE_MODIFIERS:
+# Project-specific communication adjustments.
+# Examples:
+#   - "Always cite file:line when referencing code"
+#   - "Use metric units only — this is an international project"
+- none
+
+PROJECT_NON_NEGOTIABLES:
+# Hard constraints unique to this project that override convenience.
+# Examples:
+#   - "No third-party analytics SDKs — privacy requirement"
+#   - "All user data must remain in the EU region"
+- none
+
+# ============================================================
+# SELF-TEST
+# ============================================================
+#
+# - Test: Echo module name    --> Expect: "project_hi_mode"
+# - Test: Extends             --> Expect: "~/.claude/skills/hi-mode/SKILL.md"
+# - Test: Top value           --> Expect: inherited "truth>momentum"
+# - Test: Override rule       --> Expect: "may only ADD; cannot remove or override"
+
+# ============================================================
+# CHANGELOG
+# ============================================================
+#
+# Charter-HI-Mode-Project-2026-04c ({{TODAY}}, templateRepo_EXAMPLE A4):
+#   Converted from standalone full-copy module to EXTENDS shim format
+#   per ADR-003 (two-layer HI Mode). All inline rule content intentionally
+#   removed -- rules are now inherited from central charter. Shim is
+#   mandatory even when no overrides are needed.
+#
+# Charter-HI-Mode-Project-2026-04 (baseline-template bootstrap):
+#   Initial version. Standalone module adapted from global charter.
+
+# END OF SHIM

@@ -1,0 +1,36 @@
+# SIDEQUESTS
+
+Cross-project nugget store. Ideas, experiments, and side projects that came up
+while working on this repo but don't belong to it. Future sessions in ANY repo
+can scan all SIDEQUESTS.{{AI}}ai files across `~/Documents/Projects/**/` to
+surface parked ideas by tag or status.
+
+## Convention
+
+Each entry uses this shape:
+
+```
+## YYYY-MM-DD -- <Short title>
+Status: parked | active | shipped | dropped
+Tags: <comma-separated, lowercase, kebab-case>
+Origin: <repo or context where the idea came up>
+Body:
+<the idea, design notes, why-it-matters, what-would-make-it-real>
+```
+
+Status meanings:
+- **parked**: captured, not being worked on, may revisit
+- **active**: someone is actively working on it (note where)
+- **shipped**: built and in use somewhere
+- **dropped**: explicitly decided not to pursue (keep entry as a "we considered this" record)
+
+Scan command (any future session):
+```
+glob: ~/Documents/Projects/**/SIDEQUESTS.{{AI}}ai
+```
+
+Filter by tag/status by reading and grepping.
+
+================================================================
+
+# (no entries yet -- append parked ideas below)

@@ -1,0 +1,37 @@
+#{{AIHEADER}}:1
+DOCUMENT_TYPE="AI_HANDOFF_JOURNAL"
+
+PURPOSE:
+- Shared AI-to-AI handoff and session journal
+- Used by any AI working on this repo (Claude Code, Codex, others)
+- Append session notes here so the next AI can recover context quickly
+
+USAGE:
+- Read this file near session start after `readme_AI.{{AI}}ai`
+- Append a new entry when a session materially changes code, continuity, design direction, or active conclusions
+- Keep entries concise and factual
+- Do not rewrite older entries; append new ones
+
+ENTRY_TEMPLATE:
+@YYYY-MM-DDTHH:MM-zzzz|SESSION|
+ai_name="..."|
+model="..."|
+focus_mode="..."|
+time_range="..."|
+summary="1-3 sentence plain summary of what changed or was concluded."|
+changed="Files/code/continuity changed, or 'none'."|
+observed="Important test results, failures, or repo facts established this session."|
+next="Concrete recommended next step(s)."|
+signature="AI name | model | focus mode | timestamp range"
+
+NOTES:
+- This file is a conversation journal, not the main project cartridge
+- `readme_AI.{{AI}}ai` and the `ai_context/` package remain authoritative for project state
+- `WORKSHEET.hey{{HUMAN}}` remains {{OWNER_NAME}}'s human input channel
+
+---
+
+ARCHIVES:
+- (none yet -- once this file grows, archive prior months as AI_HANDOFF_YYYY-MM.{{AI}}ai)
+
+# First session: append your entry below this line.

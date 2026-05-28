@@ -1,6 +1,6 @@
 # Inbox
 
-Quick-capture notes that don't fit elsewhere. Periodically clean — promote to `drift_log.ai`, playbooks, or ROSTER as appropriate.
+Quick-capture notes that don't fit elsewhere. Periodically clean — promote to `drift_log.{{AI}}ai`, playbooks, or ROSTER as appropriate.
 
 ---
 

@@ -45,7 +45,7 @@ for repo_path in "$WORKSPACE_ROOT"/*/; do
     [ -d "$repo_path/.git" ] || continue
     REPOS_FOUND=$((REPOS_FOUND + 1))
 
-    cartridge="$repo_path/readme_AI.ai"
+    cartridge="$repo_path/readme_AI.{{AI}}ai"
 
     if [ -z "$cartridge" ]; then
         REPOS_NO_CARTRIDGE+=("$repo_name")

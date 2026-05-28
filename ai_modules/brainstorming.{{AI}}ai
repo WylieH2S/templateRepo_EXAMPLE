@@ -1,0 +1,129 @@
+# Brainstorming Skill (Project Scope)
+#{{AIHEADER}}:1
+TYPE="skill"
+MODULE="project_brainstorming"
+VERSION="Charter-Brainstorming-Project-2026-04"
+LINEAGE="Adapted from obra/superpowers skills/brainstorming/SKILL.md"
+SCOPE="single project"
+
+# ============================================================
+# PURPOSE
+# ============================================================
+#
+# Capture project (or feature) intent BEFORE any code is written.
+# A scoped, validated design is cheaper than an undone implementation.
+# This skill runs a Socratic interview, scales the design to the
+# question's complexity, and writes the captured intent back to the
+# ai_context/ package so future sessions can fall in cleanly.
+
+# ============================================================
+# WHEN TO INVOKE
+# ============================================================
+#
+# Mandatory triggers:
+# - ai_context/project_brief.md still contains "<!-- fill in -->" or
+#   placeholder comments (fresh project, intent never captured)
+# - ai_context/CURRENT_MISSION.md North Star is empty
+#
+# Owner-initiated triggers:
+# - "Let's plan a feature" / "I want to add X"
+# - "I want to start a new <module|subsystem|component>"
+# - Scope shift: the active priority needs to change
+#
+# Do NOT skip this skill on the assumption that the work is "simple."
+# Even a todo list deserves a captured intent.
+
+# ============================================================
+# PROTOCOL
+# ============================================================
+#
+# Phase 1: ORIENT
+#   Read existing project context if any:
+#   - ai_context/project_brief.md
+#   - ai_context/CURRENT_MISSION.md
+#   - ai_context/decision_log.md (last 3 entries)
+#   - WORKSHEET.hey{{HUMAN}}
+#   Output: a 1-paragraph "what I think this project is about" summary,
+#           presented to the owner for correction before questions begin.
+#
+# Phase 2: QUESTION
+#   Ask ONE question per turn. Prefer multiple-choice over open-ended.
+#   Cover, in this order:
+#     - Identity: what is this project / feature, and for whom?
+#     - Primary goal: what does success look like?
+#     - Non-negotiables: what constraints cannot be violated?
+#     - Out-of-scope: what is explicitly NOT being built?
+#     - Riskiest unknown: what could invalidate the whole approach?
+#     - First milestone: what is the smallest shippable thing?
+#   If the owner answers a question with a question, treat it as a
+#   request for options -- present 2-3 with tradeoffs, then re-ask.
+#
+# Phase 3: PROPOSE
+#   Synthesize answers into a design. Scale to the question's complexity:
+#   - Simple feature: 3-5 sentence summary
+#   - New subsystem: 1 page with sections
+#   - New project: full project_brief.md draft
+#   Present in sections; ask owner approval after each section.
+#   Do NOT bundle approvals.
+#
+# Phase 4: WRITEBACK
+#   Once the owner has approved the design, write captures back to:
+#   - ai_context/project_brief.md (identity, architecture, glossary)
+#   - ai_context/CURRENT_MISSION.md (North Star, Active Priority,
+#     In-Scope, Out-of-Scope, Stop Conditions specific to this scope)
+#   - docs/project-brief.md (human-facing brief, if relevant)
+#   - ai_context/decision_log.md (one DEC-NNN entry capturing the
+#     scope decision, with rationale and impact)
+#   Update the Recent Deltas section of ai_context/current_state.md.
+
+# ============================================================
+# RULES
+# ============================================================
+#
+# - MUST present design before writing any code
+# - MUST ask one question per turn (do not bundle)
+# - MUST scale design depth to question complexity (no 5-page specs
+#   for one-line features)
+# - MUST NOT invoke implementation skills until owner approves design
+# - MUST NOT invent answers when the owner is uncertain -- pause and
+#   surface the uncertainty as a parked question
+
+# ============================================================
+# STOP CONDITIONS
+# ============================================================
+#
+# Pause and return control to the owner if:
+# - Owner cannot answer 2 or more core identity / goal questions
+#   (project is too speculative for capture; revisit when clearer)
+# - Two answers contradict each other (surface the conflict, do not
+#   resolve unilaterally)
+# - The design that emerges contradicts an existing decision in
+#   ai_context/decision_log.md (flag for explicit override or
+#   acknowledgment)
+
+# ============================================================
+# HARD GATE
+# ============================================================
+#
+# No code, no scaffolding, no implementation skill activation until
+# the owner has explicitly approved the captured design. Silence is
+# not approval. Implicit approval is not approval.
+
+# ============================================================
+# SELF-TEST
+# ============================================================
+#
+# - Test: Echo module name             --> Expect: "project_brainstorming"
+# - Test: Name the hard gate           --> Expect: "no code until owner approves design"
+# - Test: How many questions per turn? --> Expect: "one"
+
+# ============================================================
+# CHANGELOG
+# ============================================================
+#
+# Charter-Brainstorming-Project-2026-04 ({{TODAY}}, baseline-template
+# bootstrap): Initial version. Adapted from obra/superpowers
+# brainstorming skill. Tuned for single-project scope and the
+# baseline-template's ai_context/ writeback targets.
+
+# END OF SKILL MODULE

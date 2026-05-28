@@ -25,6 +25,6 @@
 
 **Context:** New project starting from a known-good template.
 **Decision:** Use `baseline-template` as the project skeleton.
-**Rationale:** Battle-tested AI-collaboration conventions (`.ai` / `.human`, `ai_context/` package, HI Mode personality, append-only handoff journal).
+**Rationale:** Battle-tested AI-collaboration conventions (`.{{AI}}ai` / `.hey{{HUMAN}}`, `ai_context/` package, HI Mode personality, append-only handoff journal).
 **Impact:** Project conventions inherited from the template; subsequent decisions append below.
 **Status:** Active

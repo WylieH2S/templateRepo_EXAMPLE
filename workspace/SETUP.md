@@ -31,6 +31,27 @@ Replace these before deploy:
 | `AI_NAME` | `.claude/skills/hi-mode/SKILL.md` | Your AI assistant's name or persona (e.g., `Claude`) |
 | `UNLOCK_PHRASE` | `.claude/skills/hi-mode/SKILL.md` | A phrase the AI echoes to confirm it has read the rules |
 | `OWNER_NAME` | `.claude/skills/hi-mode/SKILL.md` | Your name or handle |
+| `{{AI}}` | filenames + content (ext `.{{AI}}ai`) | Lowercased AI name — becomes the AI file extension (e.g. `chloe` → `.chloeai`). See ADR-009. |
+| `{{HUMAN}}` | filenames + content (ext `.hey{{HUMAN}}`) | Lowercased owner name — becomes the human file extension (e.g. `wy` → `.heywy`). |
+| `{{AIHEADER}}` | content (cartridge header `#…:1`) | Uppercase of the AI extension (e.g. `CHLOEAI`). |
+
+**Per-duo file extensions (ADR-009).** Unlike the per-project template, `init-project.sh`
+deliberately skips `workspace/`, so you substitute these by hand. The workspace scaffold ships
+with placeholder extensions (`drift_log.{{AI}}ai`, `ski_lift_log.{{AI}}ai`) that you rename and
+fill. Pick your AI name and human handle, then run the block below before deploying.
+
+```bash
+# Set your duo. AI is the AI half (-> .<ai>ai); HUMAN is the human half (-> .hey<human>).
+AI=chloe; HUMAN=wy; AIHEADER="$(printf '%s' "${AI}ai" | tr '[:lower:]' '[:upper:]')"
+
+# 1. Rename placeholder-extension files inside workspace/
+find workspace -type f -name '*.{{AI}}ai'     -exec sh -c 'mv "$1" "${1%.{{AI}}ai}.'"${AI}"'ai"' _ {} \;
+find workspace -type f -name '*.hey{{HUMAN}}'  -exec sh -c 'mv "$1" "${1%.hey{{HUMAN}}}.hey'"${HUMAN}"'"' _ {} \;
+
+# 2. Substitute the tokens in workspace/ content (macOS/BSD; drop the '' after -i on Linux/GNU)
+grep -rl '{{AI}}\|{{HUMAN}}\|{{AIHEADER}}' workspace/ | \
+  xargs sed -i '' "s|{{AIHEADER}}|${AIHEADER}|g; s|{{AI}}|${AI}|g; s|{{HUMAN}}|${HUMAN}|g"
+```
 
 Bulk find-and-replace for WORKSPACE_OWNER and GITHUB_USERNAME:
 
@@ -63,7 +84,7 @@ cp workspace/ROSTER.md "$WORKSPACE/"
 mkdir -p "$WORKSPACE/.repo-manager"
 cp workspace/.repo-manager/README.md "$WORKSPACE/.repo-manager/"
 cp workspace/.repo-manager/inbox.md "$WORKSPACE/.repo-manager/"
-cp workspace/.repo-manager/drift_log.ai "$WORKSPACE/.repo-manager/"
+cp workspace/.repo-manager/drift_log.{{AI}}ai "$WORKSPACE/.repo-manager/"
 ```
 
 **2. Set up workspace canonical skills:**
@@ -119,8 +140,8 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet
 | `ROSTER.md` | Repo lifecycle dashboard |
 | `.repo-manager/README.md` | Workspace conventions |
 | `.repo-manager/inbox.md` | Between-session quick capture |
-| `.repo-manager/drift_log.ai` | Fleet drift findings journal (starts empty) |
+| `.repo-manager/drift_log.{{AI}}ai` | Fleet drift findings journal (starts empty) |
 | `.claude/skills/hi-mode/SKILL.md` | Starter operating charter (customize with your AI name + unlock phrase) |
-| `.claude/skills/hi-mode/ski_lift_log.ai` | Tooling adoption candidates log (starts empty) |
+| `.claude/skills/hi-mode/ski_lift_log.{{AI}}ai` | Tooling adoption candidates log (starts empty) |
 | `.claude/skills/fleet-status/fleet-status.sh` | Fleet status script — surfaces latest HANDOFF from every repo |
 | `.claude/skills/fleet-status/SKILL.md` | `/fleet-status` slash command definition |

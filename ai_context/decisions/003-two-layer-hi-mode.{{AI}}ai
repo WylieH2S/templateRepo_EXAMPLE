@@ -1,0 +1,57 @@
+#{{AIHEADER}}:1
+# ADR-003: Two-Layer HI Mode — Central Charter + Per-Repo Extension
+**Status:** Accepted
+**Date:** 2026-04-30
+**Signed:** WH
+
+## Context
+
+HI Mode (High-Integrity operating kernel) defines how the AI behaves: voice, values, git safety, stop-the-line rules, zoom levels, model/effort tiers, session wrap protocol. It lives centrally at:
+  `~/.claude/skills/hi-mode/SKILL.md`
+
+Each repo also has `ai_modules/hi_mode.{{AI}}ai` — a per-repo personality module. Without a clear contract, these can drift. Central charter updates don't propagate. Per-repo overrides silently override safety rules. Two "HI Modes" with no defined relationship is a coherence risk.
+
+## Decision
+
+**Two layers with a strict contract:**
+
+**Layer 1 — Central charter** (`.claude/skills/hi-mode/SKILL.md`):
+- Source of truth for all behavioral rules
+- Loaded at session start via `/hi-mode` skill
+- Never forked — updated centrally
+
+**Layer 2 — Per-repo extension** (`ai_modules/hi_mode.{{AI}}ai`):
+- Loads Layer 1 first (references it explicitly)
+- Can only ADD: project-specific stop-the-line triggers, voice modifiers, additional non-negotiables
+- Cannot REMOVE or OVERRIDE any central rule
+- If no overrides are needed, file is a thin shim — one-liner: "Extends central HI Mode. No project-specific overrides."
+
+**Contract in code:**
+```
+#{{AIHEADER}}:1
+EXTENDS: .claude/skills/hi-mode/SKILL.md
+PROJECT_OVERRIDES:
+  stop_the_line_additions:
+    - (project-specific triggers here, or "none")
+  voice_modifiers:
+    - (e.g., "always cite file:line when referencing code", or "none")
+  project_non_negotiables:
+    - (e.g., "security-scanner: no outbound attack automation", or "none")
+```
+
+**All repos get HI Mode.** The per-repo shim is mandatory; it signals explicitly that HI Mode is active even when no overrides exist.
+
+## Alternatives Considered
+
+| Option | Why Rejected |
+|--------|-------------|
+| Single global HI Mode, no per-repo file | No way to add project-specific safety rules (e.g., security-scanner's no-attack constraint). |
+| Full fork per repo | Charter drift guaranteed. Safety updates don't propagate. |
+| No central charter; each repo defines its own | Cannot maintain behavioral consistency across 12 repos. |
+
+## Consequences
+
+- Central charter updates propagate automatically (per-repo files just reference it).
+- Project-specific constraints are explicit and discoverable.
+- Per-repo hi_mode.{{AI}}ai is a required file in all templates and working repos.
+- Layer 1 must be stable — breaking changes to the central charter need to be flagged at boot for all active repos.

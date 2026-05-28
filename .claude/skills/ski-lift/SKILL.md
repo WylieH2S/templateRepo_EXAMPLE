@@ -1,13 +1,13 @@
 ---
 name: ski-lift
-description: Capture a SKI LIFT observation — a tool, library, or capability that would automate or eliminate something we're doing manually. Appends to ai_context/ski_lift_log.ai in the standard format. Use whenever you notice we're doing manually what an existing tool would do better.
+description: Capture a SKI LIFT observation — a tool, library, or capability that would automate or eliminate something we're doing manually. Appends to ai_context/ski_lift_log.{{AI}}ai in the standard format. Use whenever you notice we're doing manually what an existing tool would do better.
 ---
 
 # /ski-lift
 
 A **SKI LIFT** is raised when we are doing X manually and a tool, library, feature, or platform capability would automate or eliminate it. It is a non-blocking lateral observation — the user decides whether to act on it.
 
-(Formal definition: ADR-007 in templateRepo_EXAMPLE / `ai_context/decisions/007-ski-lift-mechanism.ai`.)
+(Formal definition: ADR-007 in templateRepo_EXAMPLE / `ai_context/decisions/007-ski-lift-mechanism.{{AI}}ai`.)
 
 ## When to raise a SKI LIFT
 
@@ -18,7 +18,7 @@ A **SKI LIFT** is raised when we are doing X manually and a tool, library, featu
 
 ## What this skill does
 
-1. Locate the SKI LIFT log: `ai_context/ski_lift_log.ai`. Create it if missing (with a header).
+1. Locate the SKI LIFT log: `ai_context/ski_lift_log.{{AI}}ai`. Create it if missing (with a header).
 2. Collect the SKI LIFT fields from the user. Ask only the ones not obvious from context.
 3. Format and append the entry.
 4. Confirm to the user (don't ask for further action — SKI LIFTs are observations, not commitments).
@@ -47,7 +47,7 @@ Then invoke this skill to persist it.
 ## Header (when creating the file for the first time)
 
 ```
-#AI:1
+#{{AIHEADER}}:1
 TYPE="ski_lift_log"
 SCOPE="cross-cutting or per-repo tooling intelligence"
 FORMAT="see ADR-007 for spec"

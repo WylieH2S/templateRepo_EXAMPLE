@@ -21,10 +21,10 @@
 ## Substrate touched
 
 <!-- If this PR modifies AI substrate files, note which: -->
-- [ ] `readme_AI.ai` (THREADS, HANDOFF, STATE)
+- [ ] `readme_AI.{{AI}}ai` (THREADS, HANDOFF, STATE)
 - [ ] `ai_context/current_state.md`
 - [ ] `ai_context/decision_log.md` (new DEC-N)
-- [ ] `ai_context/decisions/*.ai` (new ADR)
+- [ ] `ai_context/decisions/*.{{AI}}ai` (new ADR)
 - [ ] CLAUDE.md path-routing
 - [ ] Other substrate file (specify)
 

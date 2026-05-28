@@ -1,0 +1,68 @@
+#{{AIHEADER}}:1
+# ADR-009: Per-Duo File Extensions, Auto-Substituted at Init
+**Status:** Accepted
+**Date:** {{TODAY}}
+**Signed:** {{OWNER_NAME}}
+**Supersedes:** ADR-004
+
+## Context
+
+ADR-004 established three audiences (AI / human / software) via three literal
+extensions: `.ai`, `.human`, `.md`. The three-audience principle was sound. The
+literal extensions were not:
+
+1. **`.ai` collides with Adobe Illustrator.** Claude Code's Read tool treats `.ai`
+   as a binary image format and refuses to open it. A repo bootstrapped from this
+   template would have AI substrate its own AI could not Read — the exact failure
+   this template exists to prevent.
+2. **The extension encodes a specific duo.** Across the real fleet, the convention
+   that actually shipped is `.chloeai` (for Chloe, the AI) and `.heywy` (for Wy, the
+   human) — `.chloeai` = "for Chloe to read", `.heywy` = "hey Wy". The extension names
+   the user-AI pair. A *shared* template cannot hard-code one duo's names: a different
+   duo (e.g. Demay + their AI) needs `.heydemay` + `.<their-ai>ai`.
+
+## Decision
+
+The template carries **placeholder extensions** that `init-project.sh` substitutes
+per-duo at bootstrap. Three tokens are introduced (shown here with angle brackets to
+avoid being substituted in this very file):
+
+| Template (on disk) | Token              | Derived from            | After init (chloe / Wy) |
+|--------------------|--------------------|-------------------------|-------------------------|
+| `*.<AI>ai`         | the AI token       | lowercased AI name      | `*.chloeai`             |
+| `*.hey<HUMAN>`     | the HUMAN token    | lowercased owner name   | `*.heywy`               |
+| `#<AIHEADER>:1`    | the AIHEADER token | uppercase of the AI ext | `#CHLOEAI:1`            |
+| `.md`              | (none — unchanged) | —                       | `.md`                   |
+
+`init-project.sh` prompts for the AI name (one new prompt; the human extension derives
+from the existing owner-name prompt), then **renames** every placeholder-named file and
+**substitutes** the tokens in file content, including the cartridge header.
+
+Real repos that already use `.chloeai` / `.heywy` are unchanged — this ADR governs the
+template only.
+
+## Alternatives Considered
+
+| Option | Why Rejected |
+|--------|-------------|
+| Keep literal `.ai` / `.human` (ADR-004) | `.ai` unreadable by Read tool; not duo-neutral for a shared template. |
+| Static-generic extension (e.g. `.aifile`) | Loses the duo semantics ("for Chloe", "hey Wy") that make the convention legible. |
+| Readable neutral stand-in (`.tmplai`) renamed at init | Same end state, but an extra indirection; placeholder tokens match the template's existing substitution mechanism and are self-documenting. |
+
+## Consequences
+
+- A bootstrapped repo's substrate is Read-able by its own AI from the first session.
+- Each duo gets extensions that name their pair; the template stays duo-neutral.
+- `init-project.sh` gained a rename pass plus three new substitution tokens. The bundled
+  `validate.sh`, `drift-sweep`, and `CLAUDE.md` path table all reference the placeholder
+  extensions and resolve after init.
+- Template files literally contain brace placeholders in their names on disk; shell
+  operations on them must quote paths and must not strip the brace suffix inline in a
+  `${var%...}` expansion (held in a variable instead). Accepted cost for self-documenting
+  placeholders.
+- ADR-004 is preserved as the historical record of the original three-audience decision.
+
+## Credits / Attribution
+
+Driven by DO-021 in the workspace drift log; the `.ai` collision was discovered when
+Claude's Read tool refused the template's own ADR files.

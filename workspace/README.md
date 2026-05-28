@@ -16,7 +16,7 @@ Parent folder for WORKSPACE_OWNER projects. Each subdirectory is an independent 
 ## Conventions
 
 - All projects use the two-tier load model (`CLAUDE.md` routing → `ai_context/` + `.claude/rules/`)
-- All projects use the `.ai` continuity substrate (`readme_AI`, `AI_HANDOFF`, `WORKSHEET`, `SIDEQUESTS`)
+- All projects use the `.{{AI}}ai` continuity substrate (`readme_AI`, `AI_HANDOFF`, `WORKSHEET`, `SIDEQUESTS`)
 - All projects are remoted to `git@github.com:GITHUB_USERNAME/<repo>.git`
 - All projects are private unless explicitly marked otherwise in `ROSTER.md`
 
@@ -24,5 +24,5 @@ Parent folder for WORKSPACE_OWNER projects. Each subdirectory is an independent 
 
 - **Starting an AI session** — read `CLAUDE.md` (Claude Code) or `AGENTS.md` (other AIs) for the boot sequence.
 - **Picking a project** — check `ROSTER.md` for status, then `cd` into the chosen repo.
-- **Cross-repo work** — operate from this folder; log findings in `.repo-manager/drift_log.ai`.
+- **Cross-repo work** — operate from this folder; log findings in `.repo-manager/drift_log.{{AI}}ai`.
 - **Bootstrapping a new project** — clone `templateRepo_EXAMPLE`, run `init-project.sh`, then update `ROSTER.md`.

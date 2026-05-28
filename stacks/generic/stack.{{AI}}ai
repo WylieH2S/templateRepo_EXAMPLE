@@ -1,0 +1,17 @@
+#{{AIHEADER}}:1
+TYPE="stack_meta"
+STACK="generic"
+DISPLAY_NAME="Generic (no stack)"
+
+DESCRIPTION:
+No language-specific defaults. Use this when the project stack is not
+yet decided, or when it's a mixed/unusual stack that doesn't fit any
+of the named starter packs.
+
+RECOMMENDED_TOOLS:
+- (fill in — all fields are blank prompts)
+
+INIT_NOTES:
+- init-project.sh copies code.{{AI}}ai → .claude/rules/code.{{AI}}ai
+- init-project.sh copies tests.{{AI}}ai → .claude/rules/tests.{{AI}}ai
+- Every section is a fill-in prompt — nothing pre-seeded

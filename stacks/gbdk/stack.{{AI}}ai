@@ -1,0 +1,25 @@
+#{{AIHEADER}}:1
+TYPE="stack_meta"
+STACK="gbdk"
+DISPLAY_NAME="Game Boy Development Kit (GBDK-2020)"
+
+DESCRIPTION:
+C-based Game Boy / Game Boy Color homebrew development. Uses the
+GBDK-2020 fork of the original GBDK with SDCC compiler. Targets DMG,
+CGB, and (via GBA mode) AGB. Suitable for games, demos, and link-cable
+peripherals.
+
+RECOMMENDED_TOOLS:
+- Toolchain:     GBDK-2020 (https://github.com/gbdk-2020/gbdk-2020)
+- Compiler:      SDCC (bundled with GBDK)
+- Build:         GNU make (Makefile drives lcc/SDCC)
+- Emulator:      SameBoy (accurate, headless+Lua scriptable) and BGB (debugger, link-cable sim)
+- Tile/sprite:   png2asset (bundled), Tiled editor for maps, GBStudio for high-level prototyping
+- Source mgmt:   git; .gb ROMs are binary — keep in build/ via .gitignore
+
+INIT_NOTES:
+- init-project.sh copies code.{{AI}}ai → .claude/rules/code.{{AI}}ai
+- init-project.sh copies tests.{{AI}}ai → .claude/rules/tests.{{AI}}ai
+- Install GBDK-2020 to /opt/gbdk or similar, then set GBDK_HOME in Makefile or environment
+- Hard ROM-size limits — pick MBC (memory bank controller) early; switching mid-project is painful
+- No floating point, no heap (no malloc) — design for static buffers from day one

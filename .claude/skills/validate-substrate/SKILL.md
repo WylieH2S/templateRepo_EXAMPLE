@@ -14,32 +14,32 @@ The script detects "template mode" by the presence of `init-project.sh`. In temp
 
 ### Tier 1 (always-loaded) files — must exist:
 - `CLAUDE.md` — path-routing table
-- `STARTUP_AI.ai` — boot file (READ_ORDER source of truth)
-- `readme_AI.ai` — active threads + latest handoff
-- `ai_context/ai_rules.ai` — hard constraints
-- `ai_context/glossary.ai` — terminology
+- `STARTUP_AI.{{AI}}ai` — boot file (READ_ORDER source of truth)
+- `readme_AI.{{AI}}ai` — active threads + latest handoff
+- `ai_context/ai_rules.{{AI}}ai` — hard constraints
+- `ai_context/glossary.{{AI}}ai` — terminology
 - `ai_context/START_HERE.md` — file map and conventions
 
 ### ai_modules/ — must exist:
 - `ai_modules/` directory
-- `ai_modules/hi_mode.ai` — HI Mode shim
+- `ai_modules/hi_mode.{{AI}}ai` — HI Mode shim
 
 ### EXTENDS path resolution:
-- Reads `EXTENDS=` line from `ai_modules/hi_mode.ai`
+- Reads `EXTENDS=` line from `ai_modules/hi_mode.{{AI}}ai`
 - Expands `~` to `$HOME` and confirms the target file exists
 - FAIL in normal mode, WARN in template mode
 
 ### Path-scoped rules — must exist if referenced from CLAUDE.md:
-- `.claude/rules/code.ai`
-- `.claude/rules/tests.ai`
-- `.claude/rules/ai-context.ai`
-- `.claude/rules/docs.ai`
+- `.claude/rules/code.{{AI}}ai`
+- `.claude/rules/tests.{{AI}}ai`
+- `.claude/rules/ai-context.{{AI}}ai`
+- `.claude/rules/docs.{{AI}}ai`
 
 ### Hygiene checks:
 - `.gitignore` present
-- `AI_HANDOFF.ai` present
-- `WORKSHEET.human` present
-- `SIDEQUESTS.ai` present
+- `AI_HANDOFF.{{AI}}ai` present
+- `WORKSHEET.hey{{HUMAN}}` present
+- `SIDEQUESTS.{{AI}}ai` present
 
 ### Tracked junk:
 - No tracked `.DS_Store` files
@@ -51,12 +51,12 @@ The script detects "template mode" by the presence of `init-project.sh`. In temp
 
 ### Freshness checks (90-day threshold):
 - `ai_context/current_state.md` modified within 90 days
-- `AI_HANDOFF.ai` modified within 90 days
-- `readme_AI.ai` modified within 90 days
+- `AI_HANDOFF.{{AI}}ai` modified within 90 days
+- `readme_AI.{{AI}}ai` modified within 90 days
 
 ### Size sanity:
-- `AI_HANDOFF.ai` ≤ 200 KB (warn above — rotate older entries to archive)
-- `ai_context/current_state.md` ≤ 50 KB (warn above — rotate older deltas to readme_AI_archive.ai)
+- `AI_HANDOFF.{{AI}}ai` ≤ 200 KB (warn above — rotate older entries to archive)
+- `ai_context/current_state.md` ≤ 50 KB (warn above — rotate older deltas to readme_AI_archive.{{AI}}ai)
 
 ## How to invoke
 

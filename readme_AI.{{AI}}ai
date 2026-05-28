@@ -1,0 +1,71 @@
+#{{AIHEADER}}:1
+PROJECT_CARTRIDGE="true"
+
+USAGE:
+Active state only. Historical DECISIONS, DELTA, and old HANDOFFs live in
+ai_context/readme_AI_archive.{{AI}}ai (Tier 2 — read on demand).
+
+AI PROCEDURE:
+1) Read this file fully before analysis or execution.
+2) Do not infer project state without it.
+3) Begin interaction by:
+   - Echoing the Unlock Phrase
+   - Listing THREADS (id, status, tier)
+   - Listing ASSUMPTIONS (or "none")
+   - Surfacing most recent HANDOFF: zoom_level, recommended_model, recommended_effort, task_queue
+   - If recommended model/effort differs from current: flag it and wait for user to adjust
+4) If required context is missing or unclear, STOP and request clarification.
+
+SCOPE:
+- This file tracks active state: open THREADS, latest 1-2 HANDOFFs.
+- AI behavior and rules live in ai_modules/hi_mode.{{AI}}ai and ai_context/ai_rules.{{AI}}ai.
+- History lives in ai_context/readme_AI_archive.{{AI}}ai.
+
+---
+
+UNLOCK_PHRASE:
+"{{UNLOCK_PHRASE}}"
+
+---
+
+STATE:
+PROJECT_NAME="{{PROJECT_NAME}}"
+REPO="{{REPO_PATH_OR_URL}}"
+GOAL="{{PROJECT_GOAL_STATEMENT}}"
+STATUS="Bootstrapped {{TODAY}} — awaiting first real work"
+
+CURRENT_BRANCH="main"
+
+THREADS:
+- THR-001|open|tier=sonnet|"Define project goal, scope, and success criteria"
+- THR-002|open|tier=sonnet|"Define initial work threads and acceptance criteria"
+
+ASSUMPTIONS:
+- none
+
+---
+
+HANDOFF_LOG:
+; Keep latest 1-2 entries here. Move older entries to ai_context/readme_AI_archive.{{AI}}ai.
+; Format:
+; @date|SESSION|
+; zoom_level=STRATEGIC|TACTICAL|OPERATIONAL
+; recommended_model=haiku|sonnet|opus
+; recommended_effort=low|medium|high
+; reason="..."
+; task_queue=[{tier:X, task:"..."},...]
+; next_zoom_trigger="..."
+; signed="Model | version | date"
+
+@2026-04-29|SESSION-001|
+zoom_level=STRATEGIC
+recommended_model=sonnet
+recommended_effort=medium
+reason="New project with placeholder state. First work is to define PROJECT_NAME, REPO, GOAL, STATUS, and initial THREADS before any implementation."
+task_queue=[
+  {tier:sonnet, task:"Define project goal, scope, and success criteria"},
+  {tier:sonnet, task:"Define initial work threads and acceptance criteria"},
+  {tier:haiku, task:"Set up remote repository (if external)"}
+]
+next_zoom_trigger="Initial project definition complete (PROJECT_NAME, GOAL, initial THREADS defined) → zoom to TACTICAL"
+signed="Claude claude-sonnet-4-6 | Charter-HI-Mode-Repo-2026-04b | 2026-04-29"

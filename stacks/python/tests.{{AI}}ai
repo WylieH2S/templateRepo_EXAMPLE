@@ -1,0 +1,21 @@
+#{{AIHEADER}}:1
+TYPE="path_rules"
+GLOB="tests/**, test_*.py, *_test.py"
+
+TEST_COMMAND:
+- uv run pytest tests/ -q
+- uv run pytest --cov=src --cov-report=term-missing for coverage
+
+TEST_CONVENTIONS:
+- Test files: test_<module>.py mirroring src/ layout
+- Test functions: test_<what_it_does> — full sentence in name preferred
+- Fixtures in conftest.py at appropriate scope level
+- Use pytest.mark for slow/integration tests: @pytest.mark.integration
+
+COVERAGE_REQUIREMENTS:
+- (fill in — e.g., "no hard threshold" or "80% line coverage minimum")
+
+FORBIDDEN_IN_TESTS:
+- No real network calls — use responses or httpx mock
+- No real filesystem writes outside tmp_path fixture
+- No skipped tests without a comment and tracking issue

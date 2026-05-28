@@ -4,7 +4,7 @@
 
 > Updated every session that changes code, version, or open items.
 > Prefer tables over prose — scannable beats narrative.
-> When this file crosses ~50 KB, rotate older Recent Work entries to `readme_AI_archive.ai`.
+> When this file crosses ~50 KB, rotate older Recent Work entries to `readme_AI_archive.{{AI}}ai`.
 
 ---
 

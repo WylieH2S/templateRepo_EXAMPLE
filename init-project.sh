@@ -2,8 +2,14 @@
 set -euo pipefail
 
 # init-project.sh -- one-shot bootstrap for a project cloned from templateRepo_EXAMPLE.
-# Prompts for project metadata and stack, copies chosen stack rules into .claude/rules/,
-# sweeps placeholder tokens, seeds ADR-001 for the stack choice, then self-deletes.
+# Prompts for project metadata, owner, AI name, and stack. Then:
+#   - renames placeholder-extension files to the per-duo extensions
+#       *.{{AI}}ai      -> *.<ai>ai      (e.g. readme_AI.chloeai)
+#       *.hey{{HUMAN}}  -> *.hey<human>  (e.g. WORKSHEET.heywy)
+#   - copies the chosen stack rules into .claude/rules/
+#   - substitutes placeholder tokens in file content (incl. the #...:1 header)
+#   - seeds ADR-001 for the stack choice, then self-deletes.
+# See ADR-009 (per-duo file extensions) for the why.
 
 cd "$(dirname "$0")"
 
@@ -21,16 +27,33 @@ echo
 
 read -r -p "Project name (no spaces, e.g. MyProject): " PROJECT_NAME
 read -r -p "Project blurb (one sentence): " PROJECT_BLURB
-read -r -p "Owner name (e.g. Alice): " OWNER_NAME
+read -r -p "Owner name (the human half of the duo, e.g. Alice): " OWNER_NAME
+read -r -p "AI name (the AI half of the duo, e.g. chloe): " AI_NAME
 read -r -p "Repo URL or path (e.g. github.com/user/repo): " REPO_PATH
 read -r -p "Unlock phrase [Rangers lead the way!]: " UNLOCK_PHRASE
 UNLOCK_PHRASE="${UNLOCK_PHRASE:-Rangers lead the way!}"
 TODAY="$(date +%F)"
 
-if [[ -z "$PROJECT_NAME" || -z "$PROJECT_BLURB" || -z "$OWNER_NAME" ]]; then
-  echo "ERROR: project name, blurb, and owner name are required." >&2
+if [[ -z "$PROJECT_NAME" || -z "$PROJECT_BLURB" || -z "$OWNER_NAME" || -z "$AI_NAME" ]]; then
+  echo "ERROR: project name, blurb, owner name, and AI name are required." >&2
   exit 1
 fi
+
+# ── Derive per-duo extension tokens (ADR-009) ────────────────────────────────
+#   AI       lowercased AI name, alnum only      -> file ext is "<AI>ai"  (.chloeai)
+#   HUMAN    lowercased owner name, alnum only    -> human ext is "hey<HUMAN>" (.heywy)
+#   AIHEADER uppercase of the AI extension        -> cartridge header (#CHLOEAI:1)
+AI="$(printf '%s' "$AI_NAME"    | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')"
+HUMAN="$(printf '%s' "$OWNER_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')"
+AIHEADER="$(printf '%s' "${AI}ai" | tr '[:lower:]' '[:upper:]')"
+
+if [[ -z "$AI" || -z "$HUMAN" ]]; then
+  echo "ERROR: AI name and owner name must each contain at least one letter or digit." >&2
+  exit 1
+fi
+
+echo
+echo "Extensions: AI files -> .${AI}ai   |   human files -> .hey${HUMAN}   |   header -> #${AIHEADER}:1"
 
 # ── Stack selection ───────────────────────────────────────────────────────────
 echo
@@ -77,6 +100,29 @@ esac
 echo
 echo "Stack: ${STACK_DISPLAY}"
 
+# ── Rename placeholder-extension files to the per-duo extensions ─────────────
+# stacks/ is renamed at copy time below; workspace/ is a separate deploy path
+# (see workspace/SETUP.md) and keeps its placeholders.
+echo
+echo "Renaming substrate files to .${AI}ai / .hey${HUMAN}..."
+# NOTE: the placeholder suffixes are held in variables. Writing the brace
+# pattern inline (e.g. ${f%.{{AI}}ai}) mis-parses — bash closes the ${...} at
+# the first '}' inside '{{AI}}', corrupting the result.
+ai_suffix='.{{AI}}ai'
+human_suffix='.hey{{HUMAN}}'
+renamed=0
+while IFS= read -r -d '' f; do
+  mv "$f" "${f%"$ai_suffix"}.${AI}ai"
+  renamed=$((renamed+1))
+done < <(find . -type f -name '*.{{AI}}ai' \
+           ! -path './.git/*' ! -path './stacks/*' ! -path './workspace/*' -print0)
+while IFS= read -r -d '' f; do
+  mv "$f" "${f%"$human_suffix"}.hey${HUMAN}"
+  renamed=$((renamed+1))
+done < <(find . -type f -name '*.hey{{HUMAN}}' \
+           ! -path './.git/*' ! -path './stacks/*' ! -path './workspace/*' -print0)
+echo "Renamed ${renamed} file(s)."
+
 # ── Copy stack rules into .claude/rules/ ─────────────────────────────────────
 STACK_DIR="stacks/${STACK}"
 RULES_DIR=".claude/rules"
@@ -89,11 +135,11 @@ fi
 mkdir -p "$RULES_DIR"
 
 echo "Copying stack rules → ${RULES_DIR}/"
-cp "${STACK_DIR}/code.ai"  "${RULES_DIR}/code.ai"
-cp "${STACK_DIR}/tests.ai" "${RULES_DIR}/tests.ai"
+cp "${STACK_DIR}/code.{{AI}}ai"  "${RULES_DIR}/code.${AI}ai"
+cp "${STACK_DIR}/tests.{{AI}}ai" "${RULES_DIR}/tests.${AI}ai"
 
 # ── Append stack metadata into technical_reference.md ────────────────────────
-STACK_META="${STACK_DIR}/stack.ai"
+STACK_META="${STACK_DIR}/stack.{{AI}}ai"
 TECH_REF="ai_context/technical_reference.md"
 
 if [[ -f "$STACK_META" && -f "$TECH_REF" ]]; then
@@ -104,9 +150,9 @@ if [[ -f "$STACK_META" && -f "$TECH_REF" ]]; then
     echo ""
     echo "## Stack Starter Pack — ${STACK_DISPLAY}"
     echo ""
-    echo "Seeded from \`stacks/${STACK}/stack.ai\` at bootstrap (${TODAY})."
+    echo "Seeded from \`stacks/${STACK}/stack.${AI}ai\` at bootstrap (${TODAY})."
     echo ""
-    # Extract DESCRIPTION and RECOMMENDED_TOOLS sections from stack.ai.
+    # Extract DESCRIPTION and RECOMMENDED_TOOLS sections from stack.{{AI}}ai.
     # Format is plain blocks delimited by all-caps headers ending in colon.
     awk '
       /^DESCRIPTION:/ { in_block=1; print "### Description"; print ""; next }
@@ -127,7 +173,7 @@ while IFS= read -r -d '' f; do
 done < <(
   find . \
     -type f \
-    \( -name "*.md" -o -name "*.ai" -o -name "*.human" -o -name "*.sh" \) \
+    \( -name "*.${AI}ai" -o -name "*.hey${HUMAN}" -o -name "*.md" -o -name "*.sh" \) \
     ! -name "init-project.sh" \
     ! -path "./.git/*" \
     ! -path "./stacks/*" \
@@ -146,14 +192,17 @@ for f in "${FILES[@]}"; do
     -e "s|{{PROJECT_GOAL_STATEMENT}}|${PROJECT_BLURB}|g" \
     -e "s|{{UNLOCK_PHRASE}}|${UNLOCK_PHRASE}|g" \
     -e "s|{{TODAY}}|${TODAY}|g" \
+    -e "s|{{AIHEADER}}|${AIHEADER}|g" \
+    -e "s|{{AI}}|${AI}|g" \
+    -e "s|{{HUMAN}}|${HUMAN}|g" \
     "$f"
 done
 
 # ── Seed ADR-001 for stack choice ─────────────────────────────────────────────
-ADR_FILE="ai_context/decisions/001-stack-choice.ai"
+ADR_FILE="ai_context/decisions/001-stack-choice.${AI}ai"
 
 cat > "$ADR_FILE" <<ADEOF
-#AI:1
+#${AIHEADER}:1
 # ADR-001: Stack Choice — ${STACK_DISPLAY}
 **Status:** Accepted
 **Date:** ${TODAY}
@@ -174,7 +223,7 @@ Use **${STACK_DISPLAY}** (stacks/${STACK}/).
 | generic | Would require filling in all rules from scratch |
 
 ## Consequences
-- .claude/rules/code.ai and tests.ai are pre-seeded for ${STACK_DISPLAY}.
+- .claude/rules/code.${AI}ai and tests.${AI}ai are pre-seeded for ${STACK_DISPLAY}.
 - Fill in version pins, build commands, and project-specific rules before first AI session.
 - stacks/ directory can be deleted once rules are finalized.
 ADEOF
@@ -182,18 +231,18 @@ ADEOF
 echo "Seeded ${ADR_FILE}"
 
 # ── Update ADR index ──────────────────────────────────────────────────────────
-README_AI="ai_context/decisions/README.ai"
+README_AI="ai_context/decisions/README.${AI}ai"
 if [[ -f "$README_AI" ]]; then
   # Append stack ADR row to the index table if not already present
   if ! grep -q "001-stack-choice" "$README_AI"; then
     "${SED_INPLACE[@]}" \
-      "s|## Index|## Index\n\n| ADR | Title | Status |\n|-----|-------|--------|\n| [001](001-stack-choice.ai) | Stack Choice — ${STACK_DISPLAY} | Accepted |" \
+      "s|## Index|## Index\n\n| ADR | Title | Status |\n|-----|-------|--------|\n| [001](001-stack-choice.${AI}ai) | Stack Choice — ${STACK_DISPLAY} | Accepted |" \
       "$README_AI" 2>/dev/null || true
   fi
 fi
 
 # ── Scan for leftover tokens ──────────────────────────────────────────────────
-# Exclude .claude/skills/ — those files may legitimately document the
+# Exclude .claude/ — those files may legitimately document the
 # placeholder convention in their content. Same exclusion set as validate.sh.
 echo
 echo "Scanning for unfilled placeholder tokens..."
@@ -219,14 +268,16 @@ fi
 echo "=== Bootstrap complete ==="
 echo "  Project:  ${PROJECT_NAME}"
 echo "  Owner:    ${OWNER_NAME}"
+echo "  AI:       ${AI_NAME}"
+echo "  Exts:     .${AI}ai / .hey${HUMAN}"
 echo "  Stack:    ${STACK_DISPLAY}"
-echo "  Rules:    .claude/rules/code.ai + tests.ai"
+echo "  Rules:    .claude/rules/code.${AI}ai + tests.${AI}ai"
 echo "  ADR-001:  ${ADR_FILE}"
 echo
 echo "Next steps:"
-echo "  1. Fill in version pins and build commands in .claude/rules/code.ai"
+echo "  1. Fill in version pins and build commands in .claude/rules/code.${AI}ai"
 echo "  2. Fill in ai_context/project_brief.md and ai_context/CURRENT_MISSION.md"
-echo "  3. Confirm ai_modules/hi_mode.ai EXTENDS path resolves (defaults to ~/.claude/skills/hi-mode/SKILL.md)"
+echo "  3. Confirm ai_modules/hi_mode.${AI}ai EXTENDS path resolves (defaults to ~/.claude/skills/hi-mode/SKILL.md)"
 echo "  4. Run: bash .claude/skills/validate-substrate/validate.sh  (should pass with 0 failures)"
 echo "  5. git init && git add . && git commit -m 'bootstrap: ${PROJECT_NAME} from templateRepo_EXAMPLE'"
 echo "  (pre-commit guards: lefthook was activated above if installed, otherwise run 'brew install lefthook && lefthook install')"

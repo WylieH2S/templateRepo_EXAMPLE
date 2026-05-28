@@ -1,0 +1,30 @@
+#{{AIHEADER}}:1
+TYPE="path_rules"
+GLOB="app/**, routes/**, config/**"
+
+LANGUAGE_RUNTIME:
+- PHP 8.3+ (fill in exact version)
+- Laravel 11+ (fill in exact version)
+- Composer for dependencies
+
+BUILD:
+- composer install
+- php artisan config:cache (production)
+- ./vendor/bin/pint for formatting
+- ./vendor/bin/phpstan analyse for static analysis
+
+STYLE_CONVENTIONS:
+- Laravel Pint (PSR-12 + Laravel conventions) — do not hand-format
+- PHPStan level 8 target (or fill in project level)
+- Type declarations on all method parameters and return types
+- Thin controllers — business logic in Action classes or Service layer
+- Use Laravel's built-in features (Collections, Eloquent, Queue) before rolling custom
+
+FORBIDDEN_PATTERNS:
+- No raw SQL without DB::select with bound parameters
+- No secrets in .env.example with real values
+- No echo or var_dump() in production code — use logging
+- No logic in Blade templates — move to view composers or components
+
+EXPLICITLY_NOT_TOUCHING:
+- (fill in: in-progress migrations, vendor/, storage/, etc.)

@@ -34,7 +34,7 @@ Update when a repo changes status. The AI repo manager reads this at boot.
 ## Conventions
 
 - All repos use the two-tier load model (CLAUDE.md routing → ai_context/ + .claude/rules/)
-- All repos use the AI substrate (readme_AI.ai, AI_HANDOFF.ai, WORKSHEET.human, SIDEQUESTS.ai)
+- All repos use the AI substrate (readme_AI.{{AI}}ai, AI_HANDOFF.{{AI}}ai, WORKSHEET.hey{{HUMAN}}, SIDEQUESTS.{{AI}}ai)
 - All repos are SSH-remoted to `git@github.com:GITHUB_USERNAME/<repo>.git`
 - All repos are private unless explicitly marked PUBLIC
 

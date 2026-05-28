@@ -1,0 +1,21 @@
+#{{AIHEADER}}:1
+TYPE="stack_meta"
+STACK="php-laravel"
+DISPLAY_NAME="PHP / Laravel"
+
+DESCRIPTION:
+Laravel web applications. Full-stack with Blade/Livewire or API-only
+backends for SPA or mobile clients.
+
+RECOMMENDED_TOOLS:
+- Language:      PHP 8.3+
+- Framework:     Laravel 11+
+- Dependency:    Composer
+- Test:          PHPUnit or Pest (Pest preferred for new projects)
+- Lint:          PHP CS Fixer or Laravel Pint (Laravel's opinionated wrapper)
+- Static:        PHPStan or Larastan
+
+INIT_NOTES:
+- init-project.sh copies code.{{AI}}ai → .claude/rules/code.{{AI}}ai
+- init-project.sh copies tests.{{AI}}ai → .claude/rules/tests.{{AI}}ai
+- Pin PHP version in .php-version or composer.json platform config

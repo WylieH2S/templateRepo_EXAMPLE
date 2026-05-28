@@ -283,7 +283,7 @@ if [ -d .git ]; then
   done < <(list_source_files)
 
   stale_seconds=$((MISSION_STALE_DAYS * 86400))
-  for sub in ai_context/CURRENT_MISSION.md readme_AI.ai; do
+  for sub in ai_context/CURRENT_MISSION.md readme_AI.{{AI}}ai; do
     if [ -f "$sub" ]; then
       sub_mt=$(stat -f %m "$sub" 2>/dev/null || stat -c %Y "$sub" 2>/dev/null || echo 0)
       delta=$((newest_code - sub_mt))
