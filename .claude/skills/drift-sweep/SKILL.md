@@ -28,6 +28,8 @@ bash sweep.sh [--quiet] [--json] [--fail-on=<categories>] [<repo-path>]
 
 **Categories for `--fail-on`:** `working-tree`, `untracked-docs`, `cruft`, `file-journals`, `orphans`, `mission-freshness`, `claude-md`
 
+> `tier1-bloat` is **advisory** (warn-only) — it always runs and reports, but never counts toward the exit code, so listing it in `--fail-on` has no effect.
+
 **Pre-commit use case** — run drift-sweep in lefthook without blocking on orphans (which need manual triage):
 ```bash
 bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals
@@ -38,7 +40,7 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracke
 bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-journals | jq '.exit_failures'
 ```
 
-## Checks (v0.1.3)
+## Checks (v0.1.4)
 
 1. **Working-tree health** — total uncommitted insertions+deletions (FAIL if > `DIFF_FAIL_THRESHOLD`, default 1000); dirty file count (WARN if > `DIRTY_FILES_WARN`, default 10); count of `+// vX.Y.Z` comment lines added in a single file's diff (FAIL if > `JOURNAL_DIFF_LINES_FAIL`, default 3).
 2. **Untracked important docs** — any file under `git ls-files --others --exclude-standard` whose name contains `audit`/`findings`/`mission`/`handoff`/`decisions`/`charter`/`rules` and ends in `.md` or `.{{AI}}ai`. These should never be untracked.
@@ -47,6 +49,7 @@ bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-jour
 5. **Orphaned exports** — for each `export function|const|class|let|var|enum NAME` under `CODE_ROOTS`, count `\bNAME\b` references in other source files. Zero hits = FAIL. Skips `index.*` and `mod.d.ts` files; honors `ORPHAN_EXPORT_ALLOWLIST` regex. **`export type` and `export interface` are excluded** — they are structural TS API surface and cross-file absence is not meaningful drift.
 6. **Substrate vs. code freshness** — newest source file mtime vs. mtime of `ai_context/CURRENT_MISSION.md` and `readme_AI.{{AI}}ai`. FAIL if code is more than `MISSION_STALE_DAYS` (default 14) newer.
 7. **CLAUDE.md path-rules table sanity** — verifies `CLAUDE.md` exists and contains a path-scoped rules table header (`| Glob | ...`). Accepts any column count after `Glob`.
+8. **Always-loaded substrate bloat** (advisory, warn-only) — for each always-loaded Tier-1 file in `TIER1_FILES` (default matches this repo's CLAUDE.md Tier 1: `CLAUDE.md STARTUP_AI.{{AI}}ai readme_AI.{{AI}}ai ai_context/ai_rules.{{AI}}ai ai_context/glossary.{{AI}}ai ai_context/START_HERE.md`), WARN if its size exceeds `TIER1_BLOAT_WARN_KB` (default 25). Enforces the ADR-004 paging discipline: files loaded on every boot stay lean; session/decision history pages out to on-demand archives. Never gates (warn-only).
 
 ## How to invoke
 
@@ -103,7 +106,8 @@ Exit code: 0 if no failures, 1 if any FAIL, 2 if cannot enter target repo.
 
 ## Versions
 
-- **v0.1.3 (current)** — DO-007: `--quiet`, `--json`, and `--fail-on=<categories>` flags. `--fail-on` enables selective pre-commit gating without blocking on orphans or freshness.
+- **v0.1.4 (current)** — Added advisory (warn-only) `tier1-bloat` check: flags always-loaded substrate files over `TIER1_BLOAT_WARN_KB` (default 25). Makes the ADR-004 paging discipline self-policing so the charter-127KB read-path pattern cannot silently recur. New config: `TIER1_FILES`, `TIER1_BLOAT_WARN_KB`.
+- **v0.1.3** — DO-007: `--quiet`, `--json`, and `--fail-on=<categories>` flags. `--fail-on` enables selective pre-commit gating without blocking on orphans or freshness.
 - **v0.1.2** — DO-016: skip `type`/`interface` exports in orphan check (structural TS API surface, not runtime drift). DO-017: CLAUDE.md path-rules table regex accepts any column count after `Glob` (2-col or 3-col format).
 - **v0.1.1** — orphan check strips comment-leader lines before counting refs, eliminating false positives from stale inline comments.
 - **v0.1** — initial implementation; check categories above.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.3 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.4 — detect code/substrate drift in a repo.
 #
 # Usage: bash sweep.sh [flags] [<repo-path>]   (default: current dir)
 #
@@ -28,6 +28,12 @@
 #   MISSION_STALE_DAYS        — code-newer-than-mission FAIL threshold in days (default 14)
 #   ORPHAN_EXPORT_ALLOWLIST   — regex of export names to skip (default "^$")
 #   SOURCE_EXTENSIONS         — file extensions to treat as source (default "ts tsx js py rs go swift")
+#   TIER1_FILES               — space-separated always-loaded substrate files to size-check
+#   TIER1_BLOAT_WARN_KB       — always-loaded file size WARN threshold in KB (default 25)
+#
+# The tier1-bloat category is ADVISORY (warn-only) — it never counts toward the
+# exit code, so it cannot be gated via --fail-on. It enforces the ADR-004 paging
+# discipline: always-loaded substrate stays lean; history pages out to archives.
 #
 # Exit codes:
 #   0 = no failures (warnings allowed) [or no failures in --fail-on categories]
@@ -68,6 +74,8 @@ JOURNAL_HEADER_FAIL="${JOURNAL_HEADER_FAIL:-5}"
 MISSION_STALE_DAYS="${MISSION_STALE_DAYS:-14}"
 ORPHAN_EXPORT_ALLOWLIST="${ORPHAN_EXPORT_ALLOWLIST:-^$}"
 SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
+TIER1_FILES="${TIER1_FILES:-CLAUDE.md STARTUP_AI.{{AI}}ai readme_AI.{{AI}}ai ai_context/ai_rules.{{AI}}ai ai_context/glossary.{{AI}}ai ai_context/START_HERE.md}"
+TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
 
 FAILS=0
 WARNS=0
@@ -314,6 +322,24 @@ if [ -f CLAUDE.md ]; then
 else
   fail "CLAUDE.md missing"
 fi
+
+# ── 8. Always-loaded (Tier 1) substrate bloat ─────────────────
+# Advisory only (warn). Enforces ADR-004 paging discipline: files loaded on
+# every boot must stay lean; session/decision history pages out to on-demand
+# archives. A growing always-loaded file is the charter-127KB pattern recurring.
+CURRENT_CATEGORY="tier1-bloat"
+section "Always-loaded substrate bloat"
+tier1_bloat_hits=0
+warn_bytes=$((TIER1_BLOAT_WARN_KB * 1024))
+for sub in $TIER1_FILES; do
+  [ -f "$sub" ] || continue
+  sz=$(wc -c < "$sub" 2>/dev/null | tr -d ' ')
+  if [ "$sz" -gt "$warn_bytes" ]; then
+    warn "tier1 bloat: ${sub} is $((sz / 1024)) KB (>${TIER1_BLOAT_WARN_KB} KB) — page history out to an on-demand archive (ADR-004)"
+    tier1_bloat_hits=$((tier1_bloat_hits+1))
+  fi
+done
+[ "$tier1_bloat_hits" -eq 0 ] && pass "no always-loaded substrate files over ${TIER1_BLOAT_WARN_KB} KB"
 
 # ── Summary ───────────────────────────────────────────────────
 if [ "$JSON_OUTPUT" -eq 1 ]; then
