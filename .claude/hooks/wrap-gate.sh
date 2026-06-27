@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# wrap-gate.sh — SessionStart wrap-state gate (GENERIC: in-repo + workspace; HI Mode).
+#
+# Companion to handoff-gate.sh. Wired via .claude/settings.json SessionStart hook
+# (matchers: startup, resume, clear, compact). SessionStart stdout is injected into
+# the session context, so this banner lands in front of the agent at boot AND after
+# every compaction — surfacing a PRIOR session that committed/changed work but never
+# wrapped (no HANDOFF block written, commits left unpushed).
+#
+# Mechanism backstop for the "wrap is prose, so an abrupt session drops it" gap. The
+# boot/read edge and the pre-commit/publish edge were already mechanized (handoff-gate
+# model banner, drift-sweep up-sync); this closes the session-end/wrap edge. See the
+# repo-manager memory feedback-mechanize-every-skippable-edge.
+#
+# Handoff carrier (auto-detected, mirrors handoff-gate.sh):
+#   <repo>/readme_AI.chloeai                          present → in-repo session
+#   <repo>/.claude/skills/hi-mode/HANDOFF_LOG.chloeai else    → workspace session
+#
+# Three checks, all against the git repo containing this hook (resolved from the
+# script's own physical path, so it works from any cwd / the non-git parent):
+#   1. commits since the last HANDOFF block (last commit touching the carrier)
+#   2. unpushed commits (@{u}..HEAD)
+#   3. uncommitted changes (excl. known runtime churn: .repo-manager/queue/)
+#
+# Advisory only: ALWAYS exits 0 — a SessionStart gate must never block the session.
+
+set -uo pipefail
+
+# --- read stdin JSON (best-effort; only `source` is used, for a context note) ---
+input=$(cat 2>/dev/null || true)
+src=$(printf '%s' "$input" \
+  | grep -oE '"source"[[:space:]]*:[[:space:]]*"[^"]*"' \
+  | head -1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')
+
+# --- resolve the git repo from this script's physical location ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || SCRIPT_DIR=""
+R="$(git -C "${SCRIPT_DIR:-.}" rev-parse --show-toplevel 2>/dev/null)"
+[ -z "$R" ] && exit 0   # not in a git repo — nothing to gate
+
+# --- detect this repo's HANDOFF carrier (in-repo readme_AI vs workspace log) ---
+if [ -f "$R/readme_AI.chloeai" ]; then
+  HB_PATH="readme_AI.chloeai"
+elif [ -f "$R/.claude/skills/hi-mode/HANDOFF_LOG.chloeai" ]; then
+  HB_PATH=".claude/skills/hi-mode/HANDOFF_LOG.chloeai"
+else
+  HB_PATH=""
+fi
+
+issues=0
+details=""
+
+# 1. commits since the last HANDOFF block (carrier last-touched)
+if [ -n "$HB_PATH" ]; then
+  last_hb=$(git -C "$R" log -1 --format=%H -- "$HB_PATH" 2>/dev/null)
+  if [ -n "$last_hb" ]; then
+    unwrapped=$(git -C "$R" log "${last_hb}..HEAD" --format='%h %s' 2>/dev/null || true)
+    if [ -n "$unwrapped" ]; then
+      n=$(printf '%s\n' "$unwrapped" | grep -c .)
+      details+="  • ${n} commit(s) since the last HANDOFF block (${HB_PATH}) — prior session may not have wrapped:"$'\n'
+      details+="$(printf '%s\n' "$unwrapped" | sed 's/^/        /')"$'\n'
+      issues=$((issues + 1))
+    fi
+  fi
+fi
+
+# 2. unpushed commits
+if git -C "$R" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+  unpushed=$(git -C "$R" log '@{u}..HEAD' --format='%h %s' 2>/dev/null || true)
+  if [ -n "$unpushed" ]; then
+    n=$(printf '%s\n' "$unpushed" | grep -c .)
+    details+="  • ${n} unpushed commit(s) — off-box backup stale; push on Wy's go."$'\n'
+    issues=$((issues + 1))
+  fi
+fi
+
+# 3. uncommitted changes (excl. known runtime churn — workspace daemon queue/;
+#    harmless no-op in repos that have no such path)
+dirty=$(git -C "$R" status --porcelain 2>/dev/null | grep -v '\.repo-manager/queue/' || true)
+if [ -n "$dirty" ]; then
+  n=$(printf '%s\n' "$dirty" | grep -c .)
+  details+="  • ${n} uncommitted change(s) (excl. runtime churn):"$'\n'
+  details+="$(printf '%s\n' "$dirty" | sed 's/^/        /')"$'\n'
+  issues=$((issues + 1))
+fi
+
+note=""
+[ "$src" = "compact" ] && note=" (post-compaction re-entry)"
+
+if [ "$issues" -eq 0 ]; then
+  echo "✓ WRAP gate${note}: $(basename "$R") clean — nothing unwrapped/unpushed/uncommitted."
+else
+  echo "⚠ WRAP gate${note}: ${issues} unresolved item(s) in $(basename "$R") — a prior session may not have wrapped:"
+  printf '%s' "$details"
+  echo "   → Resolve before the first non-read action: append the HANDOFF block, commit, push on Wy's go (HI Mode SESSION WRAP)."
+fi
+exit 0
