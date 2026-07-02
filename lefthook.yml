@@ -50,10 +50,12 @@ pre-commit:
 
     # Drift sweep — catches probe journals in file headers, untracked audit docs,
     # and uncommitted churn before it accumulates into hard-to-review bulk.
-    # Gated subset: working-tree, untracked-docs, file-journals (fast, no triage needed).
+    # Gated subset: working-tree, untracked-docs, file-journals, wrap-continuity.
+    # wrap-continuity is the Agent Boot Contract W1 write-edge arm (ADR-BOOT-001) —
+    # git-native, so it fires for ANY committing agent (Claude, Codex, …).
     # Orphans and mission-freshness are advisory only — run full sweep manually to review.
     drift-sweep:
-      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals
+      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,wrap-continuity
 
     # Warn on direct main commits (override with --no-verify if intentional)
     not-on-main:

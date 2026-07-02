@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# validate-substrate — check a repo for two-tier substrate compliance.
+# validate-substrate — check a repo for two-tier substrate compliance
+# + Agent Boot Contract conformance (ADR-BOOT-001: the tool-agnostic boot floor).
 #
 # Usage: bash validate.sh [<repo-path>]   (default: current dir)
 #
@@ -32,11 +33,30 @@ fi
 echo "Validating substrate in: $(pwd)"
 [ "$TEMPLATE_MODE" -eq 1 ] && echo "(template mode — init-project.sh detected)"
 
+# Resolve a substrate filename, honoring template-mode placeholder names: in
+# TEMPLATE_MODE the AI-file extension is still the unfilled placeholder, so
+# NAME.chloeai exists as NAME.{{AI}}ai (and WORKSHEET.heywy as
+# WORKSHEET.hey{{HUMAN}}). Echoes whichever variant exists; rc=1 if neither.
+# This is what lets the template itself validate 0-fails and serve as the
+# boot-contract conformance oracle (ADR-BOOT-001).
+resolve_file() {
+  if [ -f "$1" ]; then printf '%s' "$1"; return 0; fi
+  if [ "$TEMPLATE_MODE" -eq 1 ]; then
+    local alt=""
+    case "$1" in
+      *.chloeai) alt="${1%.chloeai}.{{AI}}ai" ;;
+      *.heywy)   alt="${1%.heywy}.hey{{HUMAN}}" ;;
+    esac
+    if [ -n "$alt" ] && [ -f "$alt" ]; then printf '%s' "$alt"; return 0; fi
+  fi
+  return 1
+}
+
 # ── Tier 1 required files ─────────────────────────────────────
 section "Tier 1 required files"
-for f in CLAUDE.md STARTUP_AI.{{AI}}ai readme_AI.{{AI}}ai ai_context/ai_rules.{{AI}}ai ai_context/glossary.{{AI}}ai ai_context/START_HERE.md; do
-  if [ -f "$f" ]; then
-    pass "$f"
+for f in CLAUDE.md STARTUP_AI.chloeai readme_AI.chloeai ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/START_HERE.md; do
+  if found=$(resolve_file "$f"); then
+    pass "$found"
   else
     fail "$f (missing)"
   fi
@@ -44,12 +64,13 @@ done
 
 # ── ai_modules/ required modules ──────────────────────────────
 section "ai_modules/"
+HI_MODE_FILE=""
 if [ -d ai_modules ]; then
   pass "ai_modules/ directory"
-  if [ -f ai_modules/hi_mode.{{AI}}ai ]; then
-    pass "ai_modules/hi_mode.{{AI}}ai"
+  if HI_MODE_FILE=$(resolve_file ai_modules/hi_mode.chloeai); then
+    pass "$HI_MODE_FILE"
   else
-    fail "ai_modules/hi_mode.{{AI}}ai (missing — HI Mode shim required)"
+    fail "ai_modules/hi_mode.chloeai (missing — HI Mode shim required)"
   fi
 else
   fail "ai_modules/ (missing — required for HI Mode shim)"
@@ -57,8 +78,8 @@ fi
 
 # ── EXTENDS path resolution ───────────────────────────────────
 section "EXTENDS path resolution"
-if [ -f ai_modules/hi_mode.{{AI}}ai ]; then
-  extends_raw=$(grep -E '^EXTENDS=' ai_modules/hi_mode.{{AI}}ai | head -1 | sed -E 's/^EXTENDS="?([^"]*)"?$/\1/')
+if [ -n "$HI_MODE_FILE" ]; then
+  extends_raw=$(grep -E '^EXTENDS=' "$HI_MODE_FILE" | head -1 | sed -E 's/^EXTENDS="?([^"]*)"?$/\1/')
   if [ -n "$extends_raw" ]; then
     # Expand ~ to $HOME
     extends_path="${extends_raw/#\~/$HOME}"
@@ -70,27 +91,80 @@ if [ -f ai_modules/hi_mode.{{AI}}ai ]; then
       fail "EXTENDS path not found: $extends_raw (expanded: $extends_path) — central charter missing or moved"
     fi
   else
-    warn "hi_mode.{{AI}}ai has no EXTENDS line"
+    warn "hi_mode.chloeai has no EXTENDS line"
   fi
 fi
 
 # ── Path-scoped rules ─────────────────────────────────────────
 section "Path-scoped rules (.claude/rules/)"
-for f in code.{{AI}}ai tests.{{AI}}ai ai-context.{{AI}}ai docs.{{AI}}ai; do
+for f in code.chloeai tests.chloeai ai-context.chloeai docs.chloeai; do
   path=".claude/rules/$f"
-  if [ -f "$path" ]; then
-    pass "$path"
+  if found=$(resolve_file "$path"); then
+    pass "$found"
   else
     warn "$path (missing — OK if not referenced from CLAUDE.md)"
   fi
 done
 
+# ── Agent Boot Contract (ADR-BOOT-001) ────────────────────────
+# Conformance per .repo-manager/standards/boot-contract/BOOT-CONTRACT.chloeai.
+# R1 (STARTUP_AI capsule present → FAIL) is enforced by the Tier-1 loop above.
+# R2  CLAUDE.md + AGENTS.md must name STARTUP_AI as the bootstrap    → FAIL
+# R3  START_HERE.md must not present a competing "Boot Sequence"     → WARN
+#     (a Boot Sequence heading is fine iff the file carries the
+#      "not a competing boot sequence" deferral to STARTUP_AI)
+# W1  lefthook.yml must carry the drift-sweep wrap-continuity arm    → FAIL
+#     (git-native: fires for ANY agent that commits — Claude, Codex, …;
+#      the .claude/ SessionStart gates are UX on top, never the floor)
+# W3  .claude/settings.json SessionStart gate pair                   → WARN
+section "Agent Boot Contract (ADR-BOOT-001)"
+
+# R2 — entry docs are pointers to the capsule, not boot sequences
+for doc in CLAUDE.md AGENTS.md; do
+  if [ ! -f "$doc" ]; then
+    fail "$doc missing (R2: both entry docs must exist and name STARTUP_AI as the bootstrap)"
+  elif grep -q 'STARTUP_AI' "$doc"; then
+    pass "$doc references STARTUP_AI (R2)"
+  else
+    fail "$doc does not reference STARTUP_AI (R2: entry docs must route to the capsule)"
+  fi
+done
+
+# R3 — START_HERE must defer, not compete
+if [ -f ai_context/START_HERE.md ]; then
+  if grep -qE '^#{1,6}[[:space:]].*[Bb]oot[[:space:]][Ss]equence' ai_context/START_HERE.md; then
+    if grep -qi 'not a competing boot sequence' ai_context/START_HERE.md; then
+      pass "START_HERE.md Boot Sequence section defers to STARTUP_AI (R3)"
+    else
+      warn "START_HERE.md presents a competing Boot Sequence without the STARTUP_AI deferral (R3)"
+    fi
+  else
+    pass "START_HERE.md has no competing Boot Sequence heading (R3)"
+  fi
+fi
+
+# W1 — the git-native wrap gate (the tool-agnostic WRITE-edge floor)
+if [ ! -f lefthook.yml ]; then
+  fail "lefthook.yml missing (W1: the git-native wrap-continuity gate is the WRITE-edge floor)"
+elif grep -q 'wrap-continuity' lefthook.yml; then
+  pass "lefthook.yml carries the wrap-continuity arm (W1)"
+else
+  fail "lefthook.yml lacks the wrap-continuity arm (W1: add wrap-continuity to the drift-sweep --fail-on set)"
+fi
+
+# W3 — Claude SessionStart gate pair (optional UX layer on the W1 floor)
+if [ -f .claude/settings.json ] && grep -q 'handoff-gate.sh' .claude/settings.json && grep -q 'wrap-gate.sh' .claude/settings.json; then
+  pass ".claude SessionStart gate pair present (W3)"
+else
+  warn ".claude SessionStart gate pair absent (W3 — optional Claude UX; W1 is the floor)"
+fi
+
 # ── Hygiene ───────────────────────────────────────────────────
 section "Hygiene"
 [ -f .gitignore ] && pass ".gitignore" || fail ".gitignore (missing)"
-[ -f AI_HANDOFF.{{AI}}ai ] && pass "AI_HANDOFF.{{AI}}ai" || warn "AI_HANDOFF.{{AI}}ai (missing — OK for very new repos)"
-[ -f WORKSHEET.hey{{HUMAN}} ] && pass "WORKSHEET.hey{{HUMAN}}" || warn "WORKSHEET.hey{{HUMAN}} (missing)"
-[ -f SIDEQUESTS.{{AI}}ai ] && pass "SIDEQUESTS.{{AI}}ai" || warn "SIDEQUESTS.{{AI}}ai (missing)"
+if found=$(resolve_file AI_HANDOFF.chloeai); then pass "$found"; else warn "AI_HANDOFF.chloeai (missing — OK for very new repos)"; fi
+if found=$(resolve_file WORKSHEET.heywy); then pass "$found"; else warn "WORKSHEET.heywy (missing)"; fi
+if found=$(resolve_file SIDEQUESTS.chloeai); then pass "$found"; else warn "SIDEQUESTS.chloeai (missing)"; fi
 
 # ── Tracked junk ──────────────────────────────────────────────
 section "Tracked junk check"
@@ -125,10 +199,8 @@ if [ "$TEMPLATE_MODE" -eq 1 ]; then
   pass "Skipped (template mode — placeholders are expected and filled by init-project.sh)"
 else
   # Scan only git-tracked files so vendor dirs, generated caches, and
-  # untracked local files don't produce false positives. Exclude .claude/ and
-  # workspace/ — skill docs legitimately reference the placeholder convention,
-  # and workspace/ is a separate manual-deploy scaffold (init skips it too).
-  leftover=$(git ls-files 2>/dev/null | grep -vE '^(\.claude/|workspace/)' | xargs grep -lE '\{\{[A-Z_]+\}\}' 2>/dev/null || true)
+  # untracked local files don't produce false positives.
+  leftover=$(git ls-files 2>/dev/null | xargs grep -lE '\{\{[A-Z_]+\}\}' 2>/dev/null || true)
   if [ -n "$leftover" ]; then
     count=$(echo "$leftover" | wc -l | tr -d ' ')
     fail "$count file(s) contain unfilled {{TOKEN}} placeholders:"
@@ -143,7 +215,7 @@ fi
 section "Freshness"
 ninety_days_ago=$(date -v-90d +%s 2>/dev/null || date -d "90 days ago" +%s)
 
-for f in ai_context/current_state.md AI_HANDOFF.{{AI}}ai readme_AI.{{AI}}ai; do
+for f in ai_context/current_state.md AI_HANDOFF.chloeai readme_AI.chloeai; do
   if [ -f "$f" ]; then
     mtime=$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)
     if [ "$mtime" -lt "$ninety_days_ago" ]; then
@@ -156,21 +228,76 @@ done
 
 # ── Size sanity ───────────────────────────────────────────────
 section "Size sanity"
-if [ -f AI_HANDOFF.{{AI}}ai ]; then
-  size=$(wc -c < AI_HANDOFF.{{AI}}ai)
+if [ -f AI_HANDOFF.chloeai ]; then
+  size=$(wc -c < AI_HANDOFF.chloeai)
   if [ "$size" -gt 204800 ]; then
-    warn "AI_HANDOFF.{{AI}}ai is $((size / 1024)) KB — consider rotating older entries to an archive (threshold 200 KB)"
+    warn "AI_HANDOFF.chloeai is $((size / 1024)) KB — consider rotating older entries to an archive (threshold 200 KB)"
   else
-    pass "AI_HANDOFF.{{AI}}ai size OK"
+    pass "AI_HANDOFF.chloeai size OK"
   fi
 fi
 if [ -f ai_context/current_state.md ]; then
   size=$(wc -c < ai_context/current_state.md)
   if [ "$size" -gt 51200 ]; then
-    warn "ai_context/current_state.md is $((size / 1024)) KB — consider rotating older deltas to readme_AI_archive.{{AI}}ai (threshold 50 KB)"
+    warn "ai_context/current_state.md is $((size / 1024)) KB — consider rotating older deltas to readme_AI_archive.chloeai (threshold 50 KB)"
   else
     pass "ai_context/current_state.md size OK"
   fi
+fi
+
+# ── WISL waystone structure ───────────────────────────────────
+# Structural well-formedness per .repo-manager/standards/WISL/waystone.schema
+# §Well-formedness checks 1,2,5,6: required fields (incl boot_path) + known
+# wisl_version (1); folder == own directory; owns non-empty + repo-relative;
+# actors ≥1 with perms ∈ {read,write,none}. Check 3 (verified_at resolves) and
+# the owns↔HEAD freshness binding are drift-sweep's job, not duplicated here.
+# Additive + graceful: a repo with no waystones passes. Reuses the schema's
+# reference bash extractors (owns/actors) so the parse stays gate-consistent.
+section "WISL waystone structure"
+waystones=$(find . -name '_waystone.chloeai' -not -path '*/.git/*' 2>/dev/null | sed 's|^\./||')
+if [ -z "$waystones" ]; then
+  pass "No waystones present (WISL not adopted here — skipping)"
+else
+  REQUIRED_FIELDS="wisl_version folder orient owns depends_on verified_at actors boot_path"
+  while IFS= read -r wf; do
+    [ -z "$wf" ] && continue
+    wdir=$(dirname "$wf"); wdir="${wdir#./}"
+    wok=1
+    # (1) required fields present
+    for key in $REQUIRED_FIELDS; do
+      grep -qE "^${key}:" "$wf" || { fail "$wf: missing required field '$key'"; wok=0; }
+    done
+    # (1) wisl_version known (major 1)
+    wv=$(grep -E '^wisl_version:' "$wf" | head -1 | grep -oE '[0-9]+' | head -1)
+    if [ -n "$wv" ] && [ "$wv" != "1" ]; then
+      fail "$wf: unknown wisl_version '$wv' (tool supports 1)"; wok=0
+    fi
+    # (2) folder == own directory (repo-relative)
+    fdecl=$(grep -E '^folder:' "$wf" | head -1 | sed -E 's/^folder:[[:space:]]*//; s/^"?([^"]*)"?[[:space:]]*$/\1/')
+    if [ -n "$fdecl" ] && [ "$fdecl" != "$wdir" ]; then
+      fail "$wf: folder '$fdecl' != actual location '$wdir'"; wok=0
+    fi
+    # (5) owns non-empty + repo-relative (schema awk extractor)
+    owns=$(awk '/^owns:/{f=1;next} f&&/^[[:space:]]+-[[:space:]]/{sub(/^[[:space:]]+-[[:space:]]/,"");print;next} f&&/^[^[:space:]]/{f=0}' "$wf")
+    if [ -z "$owns" ]; then
+      fail "$wf: owns is empty (need ≥1 glob)"; wok=0
+    elif echo "$owns" | grep -qE '^/'; then
+      fail "$wf: owns has a non-repo-relative glob (leading /)"; wok=0
+    fi
+    # (6) actors ≥1 + perms ∈ {read,write,none}
+    actors=$(awk '/^actors:/{f=1;next} f&&/^[[:space:]]+[A-Za-z0-9_-]+:[[:space:]]*/{print;next} f&&/^[^[:space:]]/{f=0}' "$wf")
+    if [ -z "$actors" ]; then
+      fail "$wf: actors map empty (need ≥1)"; wok=0
+    else
+      bad=$(echo "$actors" | grep -vE ':[[:space:]]*(read|write|none)([[:space:]]|#|$)' || true)
+      if [ -n "$bad" ]; then
+        fail "$wf: actor perm(s) not in {read,write,none}: $(echo "$bad" | sed 's/^[[:space:]]*//' | tr '\n' '|')"; wok=0
+      fi
+    fi
+    [ "$wok" -eq 1 ] && pass "$wf: structure OK (fields, folder, owns, actors)"
+  done <<WAYSTONE_LIST
+$waystones
+WAYSTONE_LIST
 fi
 
 # ── Summary ───────────────────────────────────────────────────
