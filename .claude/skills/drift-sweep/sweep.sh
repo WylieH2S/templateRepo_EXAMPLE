@@ -1,5 +1,29 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.4 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.9 — detect code/substrate drift in a repo.
+#
+# v0.1.9: NEW wrap-continuity category — the Agent Boot Contract W1 WRITE edge
+# (ADR-BOOT-001). The session-wrap gate moves to git-native ground: the carrier
+# (readme_AI.chloeai in-repo / the workspace HANDOFF log in the substrate repo)
+# must not lag HEAD by more than WRAP_LAG_WARN commits (default 10), and a commit
+# that stages the carrier passes as the wrap itself. soft_fail: WARN by default,
+# gate via --fail-on=wrap-continuity. Graceful where no carrier exists, so the
+# symlinked fleet rollout is advisory-only until a repo arms it. Closes the
+# Codex/any-agent wrap gap (OFS SL-001/THR-004): .claude SessionStart gates fire
+# only for Claude sessions; every agent commits through git.
+#
+# v0.1.8: up-sync AND waystone-freshness gates are now STAGED-AWARE, closing the
+# same one-commit lag in both. (1) up-sync: inspects the staged index at commit
+# time, not just committed history, so an unaccompanied readme_AI move is caught at
+# its creating commit and the parity-restoring commit is no longer blocked.
+# (2) waystone-freshness: REFRAMED from a verified_at SHA-range diff to commit-time
+# RECENCY (the waystone must be touched as recently as the files it owns). The
+# SHA-range approach lagged because verified_at cannot point to the in-flight commit,
+# so it always flagged the commit AFTER an owned-file change, forcing a no-op
+# re-stamp; recency + staged-awareness removes that tail. verified_at is retained
+# for the dangling-sha check + as the documented last-reconciliation marker. Both
+# gates fall through to committed-date/recency comparison on a clean checkout (CI),
+# so determinism there is unchanged. See WISL-STANDARD §Enforcement + the schema's
+# verified_at field note.
 #
 # Usage: bash sweep.sh [flags] [<repo-path>]   (default: current dir)
 #
@@ -10,7 +34,13 @@
 #                            the exit code. All categories still run and report.
 #                            If omitted, all failures count. Categories:
 #                              working-tree, untracked-docs, cruft, file-journals,
-#                              orphans, mission-freshness, claude-md
+#                              orphans, mission-freshness, claude-md, waystone-freshness,
+#                              up-sync, wrap-continuity, wisl-graph, seam-coverage
+#
+# wrap-continuity, wisl-graph + seam-coverage are ADVISORY (soft_fail): WARN by
+# default, hard FAIL only when explicitly named in --fail-on (the "advisory-first,
+# then arm" rollout). All graceful-pass where their inputs are absent (no carrier /
+# no waystones / no seam map).
 #
 # Companion to validate-substrate. validate-substrate checks STRUCTURAL substrate
 # compliance (Tier 1 files exist, size thresholds, tracked junk). drift-sweep
@@ -30,6 +60,10 @@
 #   SOURCE_EXTENSIONS         — file extensions to treat as source (default "ts tsx js py rs go swift")
 #   TIER1_FILES               — space-separated always-loaded substrate files to size-check
 #   TIER1_BLOAT_WARN_KB       — always-loaded file size WARN threshold in KB (default 25)
+#   WRAP_CARRIER              — wrap-continuity carrier override (default: auto-detect
+#                               readme_AI.chloeai, else the workspace HANDOFF log)
+#   WRAP_LAG_WARN             — commits the carrier may lag HEAD before wrap-continuity
+#                               flags (default 10)
 #
 # The tier1-bloat category is ADVISORY (warn-only) — it never counts toward the
 # exit code, so it cannot be gated via --fail-on. It enforces the ADR-004 paging
@@ -74,8 +108,10 @@ JOURNAL_HEADER_FAIL="${JOURNAL_HEADER_FAIL:-5}"
 MISSION_STALE_DAYS="${MISSION_STALE_DAYS:-14}"
 ORPHAN_EXPORT_ALLOWLIST="${ORPHAN_EXPORT_ALLOWLIST:-^$}"
 SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
-TIER1_FILES="${TIER1_FILES:-CLAUDE.md STARTUP_AI.{{AI}}ai readme_AI.{{AI}}ai ai_context/ai_rules.{{AI}}ai ai_context/glossary.{{AI}}ai ai_context/START_HERE.md}"
+TIER1_FILES="${TIER1_FILES:-readme_AI.chloeai CLAUDE.md ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/CURRENT_MISSION.md ai_context/START_HERE.md}"
 TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
+WRAP_CARRIER="${WRAP_CARRIER:-}"
+WRAP_LAG_WARN="${WRAP_LAG_WARN:-10}"
 
 FAILS=0
 WARNS=0
@@ -115,6 +151,16 @@ fail() {
     JSON_CHECKS+=("{\"category\":\"${CURRENT_CATEGORY}\",\"status\":\"fail\",\"message\":\"${msg_esc}\"}")
   else
     echo "  ✗ $*"
+  fi
+}
+# soft_fail — WARN by default; hard FAIL only when this category is explicitly
+# named in --fail-on. The asymmetry vs fail() (which counts when --fail-on is
+# omitted) is deliberate: advisory categories like up-sync are opt-in-to-gate.
+soft_fail() {
+  if [ -n "$FAIL_ON_CATEGORIES" ] && should_fail_on "$CURRENT_CATEGORY"; then
+    fail "$@"
+  else
+    warn "$@"
   fi
 }
 section() {
@@ -182,7 +228,7 @@ CURRENT_CATEGORY="untracked-docs"
 section "Untracked important docs"
 if [ -d .git ]; then
   untracked_important=$(git ls-files --others --exclude-standard 2>/dev/null \
-    | grep -iE '(audit|findings|mission|handoff|decisions|charter|rules).*\.(md|ai)$' \
+    | grep -iE '(audit|findings|mission|handoff|decisions|charter|rules).*\.(md|chloeai)$' \
     || true)
   if [ -n "$untracked_important" ]; then
     while IFS= read -r f; do
@@ -291,7 +337,7 @@ if [ -d .git ]; then
   done < <(list_source_files)
 
   stale_seconds=$((MISSION_STALE_DAYS * 86400))
-  for sub in ai_context/CURRENT_MISSION.md readme_AI.{{AI}}ai; do
+  for sub in ai_context/CURRENT_MISSION.md readme_AI.chloeai; do
     if [ -f "$sub" ]; then
       sub_mt=$(stat -f %m "$sub" 2>/dev/null || stat -c %Y "$sub" 2>/dev/null || echo 0)
       delta=$((newest_code - sub_mt))
@@ -340,6 +386,251 @@ for sub in $TIER1_FILES; do
   fi
 done
 [ "$tier1_bloat_hits" -eq 0 ] && pass "no always-loaded substrate files over ${TIER1_BLOAT_WARN_KB} KB"
+
+# ── 9. WISL waystone freshness (v0.1.8: recency-based, staged-aware, lag-free) ──
+# For each _waystone.chloeai: verified_at must parse + resolve (dangling-sha check),
+# and the waystone must have been touched at least as RECENTLY as any file it owns
+# (excluding itself). Recency replaced the old `verified_at..HEAD` SHA-range diff,
+# which lagged: verified_at can't point to the in-flight commit, so the diff always
+# flagged the commit AFTER an owned-file change → a forced no-op re-stamp. With
+# recency + staged-awareness, staging code + re-stamping the waystone TOGETHER is
+# fresh forever; staging owned code without the waystone fails at the creating
+# commit. verified_at is kept for the dangling check + as the last-reconciliation
+# marker (re-stamp it to HEAD when you re-touch the card). No waystones → graceful
+# pass. See WISL-STANDARD §Enforcement.
+CURRENT_CATEGORY="waystone-freshness"
+section "WISL waystone freshness"
+if [ -d .git ]; then
+  ws_found=0
+  while IFS= read -r wf; do
+    [ -z "$wf" ] || [ ! -f "$wf" ] && continue
+    ws_found=1
+    # verified_at — quote-tolerant (schema friction #6: quoted to survive YAML int-parse)
+    sha=$(grep -oE '^verified_at:[[:space:]]*"?[0-9a-f]{7,40}"?' "$wf" | grep -oE '[0-9a-f]{7,40}' | head -1)
+    if [ -z "$sha" ]; then
+      fail "waystone ${wf}: no parseable verified_at (schema: 7–40 hex, quoted)"
+      continue
+    fi
+    if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
+      fail "waystone ${wf}: verified_at ${sha} not in git history (dangling sha)"
+      continue
+    fi
+    # owns globs — flat parse (schema's bash extractor; no YAML dep on the gate path)
+    globs=$(awk '/^owns:/{f=1;next} f&&/^[[:space:]]+-[[:space:]]/{sub(/^[[:space:]]+-[[:space:]]/,"");print;next} f&&/^[^[:space:]]/{f=0}' "$wf")
+    if [ -z "$globs" ]; then
+      fail "waystone ${wf}: empty or unparseable owns"
+      continue
+    fi
+    # Freshness by RECENCY (staged-aware), EXCLUDING the waystone file itself.
+    owned_staged=$(git diff --cached --name-only -- $globs ':(exclude)**/_waystone.chloeai' 2>/dev/null)
+    ws_staged=0; git diff --cached --quiet -- "$wf" 2>/dev/null || ws_staged=1
+    if [ -n "$owned_staged" ]; then
+      # Owned files are part of THIS commit → the waystone must be re-stamped with them.
+      if [ "$ws_staged" -eq 1 ]; then
+        pass "waystone fresh (re-stamped with this commit): ${wf}"
+      else
+        n=$(printf '%s\n' "$owned_staged" | grep -c .)
+        fail "waystone STALE: ${wf} — ${n} owned file(s) staged without re-stamping the waystone; re-read the folder, re-stamp verified_at, and stage it in this commit"
+      fi
+    elif [ "$ws_staged" -eq 1 ]; then
+      pass "waystone fresh (re-stamp staged): ${wf}"
+    else
+      # Nothing staged → committed-recency comparison (CI clean-checkout path).
+      owned_last=$(git log -1 --format=%ct -- $globs ':(exclude)**/_waystone.chloeai' 2>/dev/null)
+      ws_last=$(git log -1 --format=%ct -- "$wf" 2>/dev/null)
+      if [ -n "$owned_last" ] && { [ -z "$ws_last" ] || [ "$owned_last" -gt "$ws_last" ]; }; then
+        fail "waystone STALE: ${wf} — owned file(s) committed more recently than the waystone (verified_at ${sha}); re-read the folder + re-stamp verified_at"
+      else
+        pass "waystone fresh: ${wf} (verified_at ${sha})"
+      fi
+    fi
+  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  [ "$ws_found" -eq 0 ] && pass "no waystones present (WISL not adopted in this repo)"
+fi
+
+# ── 10. Up-sync hint freshness ────────────────────────────────
+# Opt-in by ai_context/upsync.chloeai presence. Where a repo publishes workspace-
+# relevant deltas UP (a shipped version, a stale ROSTER focus, a cross-cutting
+# finding), the hint ledger must not lag readme_AI.
+#
+# STAGED-AWARE (v0.1.8): at commit time we evaluate the PROSPECTIVE post-commit
+# state via the staged index (git diff --cached), not just committed history. This
+# closes the one-commit lag of the pure committed-date approach: previously a commit
+# that moved readme_AI WITHOUT an upsync block passed (committed dates were still
+# equal), and then the *next* commit — the one adding the upsync block to restore
+# parity — got blocked, because committed history showed readme ahead. Now: if
+# readme_AI is staged, an upsync block must be staged in the SAME commit (caught at
+# creation); staging the upsync block alone always passes (restoring parity). On a
+# clean checkout (CI) nothing is staged, so we fall through to the committed-date
+# comparison — determinism there is preserved. --cached (index vs HEAD) means
+# unstaged working-tree edits don't count, so boot-dirty behavior is unchanged too.
+# soft_fail: WARN by default, hard FAIL only via --fail-on=up-sync (boot-dirty /
+# pre-commit / CI). No hint file → silent pass, so the fleet-canonical sweep stays
+# dormant until a repo adopts the loop. (Distinct from waystone-freshness, which
+# binds folder edits to a waystone re-stamp; this binds repo state to an up-sync.)
+CURRENT_CATEGORY="up-sync"
+section "Up-sync hint freshness"
+if [ ! -f ai_context/upsync.chloeai ]; then
+  pass "up-sync not configured (no ai_context/upsync.chloeai)"
+elif [ ! -d .git ]; then
+  pass "up-sync: not a git repo — skipping"
+else
+  # Staged (index vs HEAD): non-zero exit ⇒ that path is part of this commit.
+  readme_staged=0; git diff --cached --quiet -- readme_AI.chloeai 2>/dev/null || readme_staged=1
+  hint_staged=0;   git diff --cached --quiet -- ai_context/upsync.chloeai 2>/dev/null || hint_staged=1
+  if [ "$readme_staged" -eq 1 ] || [ "$hint_staged" -eq 1 ]; then
+    # This commit touches the substrate pair — require them to move together.
+    if [ "$readme_staged" -eq 1 ] && [ "$hint_staged" -eq 0 ]; then
+      soft_fail "up-sync stale: readme_AI is staged without an ai_context/upsync.chloeai block — stage an up-sync block in the same commit (timestamps match)"
+    else
+      pass "up-sync hint current (upsync staged with this change)"
+    fi
+  else
+    # Nothing staged → committed-history comparison (CI clean-checkout path, unchanged).
+    last_readme=$(git log -1 --format=%ct -- readme_AI.chloeai 2>/dev/null)
+    last_hint=$(git log -1 --format=%ct -- ai_context/upsync.chloeai 2>/dev/null)
+    if [ -z "$last_hint" ] || { [ -n "$last_readme" ] && [ "$last_readme" -gt "$last_hint" ]; }; then
+      soft_fail "up-sync stale: readme_AI moved since the last published hint — append an ai_context/upsync.chloeai block (commit it WITH the substrate change so timestamps match)"
+    else
+      pass "up-sync hint current (readme_AI not ahead of last hint)"
+    fi
+  fi
+fi
+
+# ── 11. Wrap continuity (Agent Boot Contract W1) ──────────────
+# The tool-agnostic WRITE-edge floor (ADR-BOOT-001): every agent commits through
+# git, so the wrap gate lives here — not only in Claude's SessionStart hooks,
+# which Codex never fires (the OFS SL-001/THR-004 gap). Carrier = the repo's
+# session-continuity file: readme_AI.chloeai in-repo, or the workspace HANDOFF
+# log in the substrate repo (override via WRAP_CARRIER in drift-sweep.conf).
+# Staged-aware: a commit that moves the carrier IS the wrap — passes. Otherwise
+# the carrier must not lag HEAD by more than WRAP_LAG_WARN commits (default 10);
+# a bigger lag means sessions are piling commits on an unwrapped carrier and the
+# next agent will boot stale. File-touch is the deliberate proxy for "gained a
+# HANDOFF block" — content parsing stays in the Claude-native gates; a non-wrap
+# carrier touch resetting the counter is acceptable for an advisory floor.
+# soft_fail: WARN by default, FAIL via --fail-on=wrap-continuity. No carrier →
+# graceful pass (template pre-bootstrap, non-substrate repos).
+CURRENT_CATEGORY="wrap-continuity"
+section "Wrap continuity (boot contract W1)"
+if [ ! -d .git ]; then
+  pass "wrap-continuity: not a git repo — skipping"
+else
+  wrap_carrier="${WRAP_CARRIER}"
+  if [ -z "$wrap_carrier" ]; then
+    if [ -f readme_AI.chloeai ]; then
+      wrap_carrier="readme_AI.chloeai"
+    elif [ -f .claude/skills/hi-mode/HANDOFF_LOG.chloeai ]; then
+      wrap_carrier=".claude/skills/hi-mode/HANDOFF_LOG.chloeai"
+    fi
+  fi
+  if [ -z "$wrap_carrier" ] || [ ! -f "$wrap_carrier" ]; then
+    pass "wrap-continuity: no wrap carrier present (not adopted here)"
+  else
+    wc_staged=0; git diff --cached --quiet -- "$wrap_carrier" 2>/dev/null || wc_staged=1
+    if [ "$wc_staged" -eq 1 ]; then
+      pass "wrap-continuity: carrier staged with this commit (wrap in flight): ${wrap_carrier}"
+    else
+      wc_last=$(git log -1 --format=%H -- "$wrap_carrier" 2>/dev/null)
+      if [ -z "$wc_last" ]; then
+        soft_fail "wrap-continuity: carrier ${wrap_carrier} exists but has never been committed — commit it (untracked continuity is one crash from gone)"
+      else
+        wc_lag=$(git rev-list --count "${wc_last}..HEAD" 2>/dev/null || echo 0)
+        if [ "$wc_lag" -gt "$WRAP_LAG_WARN" ]; then
+          soft_fail "wrap-continuity: ${wc_lag} commit(s) since ${wrap_carrier} last moved (threshold ${WRAP_LAG_WARN}) — a session may not have wrapped; wrap or re-stamp the carrier before piling on more"
+        else
+          pass "wrap-continuity: carrier lag ${wc_lag} ≤ ${WRAP_LAG_WARN} (${wrap_carrier})"
+        fi
+      fi
+    fi
+  fi
+fi
+
+# ── 12. WISL waystone graph connectivity ──────────────────────
+# For each _waystone.chloeai: every depends_on (a folder) and boot_path (a file or
+# dir) edge must resolve on disk. Self-propagation (WISL-STANDARD §design intent)
+# requires the graph to actually connect — a dangling edge means the next AI lands
+# on a card pointing at a moved/renamed/typo'd path. Parses FRONTMATTER ONLY (between
+# the --- fences) so prose mentions of "boot_path" don't match; strips inline # comments.
+# No waystones → graceful pass. ADVISORY (soft_fail): WARN unless --fail-on=wisl-graph.
+CURRENT_CATEGORY="wisl-graph"
+section "WISL waystone graph connectivity"
+wg_found=0
+wg_dangling=0
+while IFS= read -r wf; do
+  [ -z "$wf" ] || [ ! -f "$wf" ] && continue
+  wg_found=1
+  wdir=$(dirname "$wf")
+  # frontmatter only (first --- … second ---), so body prose can't false-match
+  fm=$(awk '/^---[[:space:]]*$/{c++; next} c==1{print} c>=2{exit}' "$wf")
+  for key in depends_on boot_path; do
+    # extract list items under KEY: strip "- ", inline "# comment", trailing ws
+    entries=$(printf '%s\n' "$fm" | awk -v key="$key" '
+      $0 ~ "^"key":" {f=1; next}
+      f && /^[[:space:]]+-[[:space:]]/ { sub(/^[[:space:]]+-[[:space:]]*/,""); sub(/[[:space:]]*#.*$/,""); sub(/[[:space:]]+$/,""); if (length($0)) print; next }
+      f && /^[^[:space:]]/ {f=0}
+    ')
+    [ -z "$entries" ] && continue
+    while IFS= read -r e; do
+      [ -z "$e" ] && continue
+      # entries are repo-relative; boot_path may cross folders (incl. out-of-folder files)
+      if [ ! -e "$e" ]; then
+        soft_fail "wisl-graph: ${wf} ${key} → '${e}' does not resolve (dangling edge)"
+        wg_dangling=$((wg_dangling+1))
+      fi
+    done <<< "$entries"
+  done
+done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+if [ "$wg_found" -eq 0 ]; then
+  pass "wisl-graph: no waystones present (WISL not adopted in this repo)"
+elif [ "$wg_dangling" -eq 0 ]; then
+  pass "wisl-graph: all waystone edges resolve"
+fi
+
+# ── 13. WISL seam coverage ────────────────────────────────────
+# A folder the seam map declares a 'needed' or 'live' seam MUST carry a _waystone.chloeai
+# (catches a MISSING card, which waystone-freshness can't — it only catches STALE ones).
+# Reads the workspace seam-coverage projection (whitespace: repo folder status). Runs at
+# lefthook/boot only — the workspace file is absent in a single-repo CI checkout, where this
+# graceful-passes (same dangle posture as the symlinked skill). 'none'/'defer'/'candidate'
+# rows are recorded DECISIONS, not gaps, and are not checked. ADVISORY (soft_fail): WARN
+# unless --fail-on=seam-coverage (the "arm" step, deferred).
+CURRENT_CATEGORY="seam-coverage"
+section "WISL seam coverage"
+if [ ! -d .git ]; then
+  pass "seam-coverage: not a git repo — skipping"
+else
+  top=$(git rev-parse --show-toplevel 2>/dev/null)
+  seam_tsv=""
+  for cand in \
+    "${top:+${top}/../.repo-manager/standards/WISL/seam-coverage.tsv}" \
+    "${HOME}/GitHub/.repo-manager/standards/WISL/seam-coverage.tsv"; do
+    [ -n "$cand" ] && [ -f "$cand" ] && { seam_tsv="$cand"; break; }
+  done
+  if [ -z "$seam_tsv" ]; then
+    pass "seam-coverage: no workspace seam map reachable (single-repo checkout or not adopted)"
+  else
+    repo_name=$(basename "${top:-$(pwd)}")
+    sc_missing=0
+    sc_checked=0
+    while read -r r folder status _rest; do
+      [ -z "$r" ] && continue
+      case "$r" in \#*) continue ;; esac
+      [ "$r" = "$repo_name" ] || continue
+      case "$status" in needed|live) ;; *) continue ;; esac
+      sc_checked=$((sc_checked+1))
+      if [ ! -f "${folder}/_waystone.chloeai" ]; then
+        soft_fail "seam-coverage: ${repo_name}/${folder} is a '${status}' seam with no _waystone.chloeai"
+        sc_missing=$((sc_missing+1))
+      fi
+    done < "$seam_tsv"
+    if [ "$sc_checked" -eq 0 ]; then
+      pass "seam-coverage: no declared seams for ${repo_name} in the seam map"
+    elif [ "$sc_missing" -eq 0 ]; then
+      pass "seam-coverage: all ${sc_checked} declared seam(s) for ${repo_name} have waystones"
+    fi
+  fi
+fi
 
 # ── Summary ───────────────────────────────────────────────────
 if [ "$JSON_OUTPUT" -eq 1 ]; then
