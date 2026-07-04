@@ -8,8 +8,8 @@
 # boot. A model MISMATCH is elevated to STOP-THE-LINE (HI Mode charter, B3).
 #
 # Recommendation source (auto-detected by context):
-#   ./readme_AI.chloeai                          present → in-repo session
-#   .claude/skills/hi-mode/HANDOFF_LOG.chloeai   else    → workspace session
+#   ./readme_AI.{{AI}}ai                          present → in-repo session
+#   .claude/skills/hi-mode/HANDOFF_LOG.{{AI}}ai   else    → workspace session
 # Both fields are read from the LAST block in that file.
 #
 # Effort is NOT on stdin (Claude Code doesn't pass it) → surface-only: the
@@ -18,6 +18,10 @@
 # Always exits 0 — a startup gate must never block the session.
 
 set -uo pipefail
+
+# Fetch from origin silently — keeps the recommendation source up-to-date.
+# (No-op when offline or no remote; always exits 0.)
+git fetch --quiet origin 2>/dev/null || true
 
 input=$(cat 2>/dev/null || true)
 
@@ -37,13 +41,19 @@ normalize() {  # claude-opus-4-8 → opus, *sonnet* → sonnet, *haiku* → haik
 cur_model=$(normalize "$raw_model")
 
 # recommendation source by context
-if [ -f ./readme_AI.chloeai ]; then
-  SRC="./readme_AI.chloeai"; CTX="in-repo: $(basename "$(pwd)")"
-elif [ -f .claude/skills/hi-mode/HANDOFF_LOG.chloeai ]; then
-  SRC=".claude/skills/hi-mode/HANDOFF_LOG.chloeai"; CTX="workspace"
+if [ -f ./readme_AI.{{AI}}ai ]; then
+  SRC="./readme_AI.{{AI}}ai"; CTX="in-repo: $(basename "$(pwd)")"
+elif [ -f .claude/skills/hi-mode/HANDOFF_LOG.{{AI}}ai ]; then
+  SRC=".claude/skills/hi-mode/HANDOFF_LOG.{{AI}}ai"; CTX="workspace"
 else
-  echo "ℹ HANDOFF gate: no recommendation source (readme_AI.chloeai / HANDOFF_LOG.chloeai) found — skipping model/effort check."
+  echo "ℹ HANDOFF gate: no recommendation source (readme_AI.{{AI}}ai / HANDOFF_LOG.{{AI}}ai) found — skipping model/effort check."
   exit 0
+fi
+
+# Warn if still behind origin after fetch — a pull is needed to read the latest recommendation.
+if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+  _behind=$(git rev-list 'HEAD..@{u}' --count 2>/dev/null || echo 0)
+  [ "${_behind:-0}" -gt 0 ] && echo "   ⚠ HANDOFF ($CTX): ${_behind} commit(s) behind origin — git pull to read the latest recommendation."
 fi
 
 rec_model=$(grep -oE 'recommended_model="?[a-z]+"?'  "$SRC" 2>/dev/null | tail -1 | sed 's/.*=//; s/"//g')

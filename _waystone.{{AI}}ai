@@ -1,8 +1,8 @@
-#CHLOEAI:1
+#{{AIHEADER}}:1
 ---
 wisl_version: 1
 folder: .
-orient: "CANONICAL TEMPLATE: this repo is the authoritative pattern for new WylieH2S projects. It is NOT a live project — it defines the substrate skeleton that init-project.sh stamps out. Every structural decision here propagates fleet-wide when a new repo is initialized. The AI-job here is: maintaining the template + authoring the standards that downstream repos inherit."
+orient: "CANONICAL TEMPLATE: this repo is the authoritative pattern that init-project.sh stamps out into new projects. It is NOT a live project — it defines the substrate skeleton downstream repos inherit. Every structural decision here propagates when a new repo is initialized. The AI-job here is: maintaining the template + authoring the standards that downstream repos inherit."
 owns:
   - "**"
 depends_on: []
@@ -13,15 +13,18 @@ risk: >-
   standard here (CLAUDE.md format, lefthook hooks, drift-sweep version), you must
   also plan fleet rollout or document the version delta. PLACEHOLDER SYNTAX: files
   use {{AI}} and {{HUMAN}} as template tokens (e.g. readme_AI.{{AI}}ai); do NOT
-  expand these — they are expanded by init-project.sh at init time. The
-  templateRepo_EXAMPLE itself keeps them unexpanded.
-continuity: "templateRepo_EXAMPLE is TEMPLATE status in the ROSTER — read-only unless updating a fleet-wide standard. Substrate packs live in stacks/; the drift-sweep canonical skills live in ~/GitHub/.claude/skills/ (symlinked into active repos, not copied from here). validate-substrate and the standard lefthook hooks are the authoritative source here."
-validation: "bash init-project.sh --dry-run 2>&1 | head -20  # if that flag exists; else: bash -n init-project.sh"
-verified_at: "5b4ef75"
+  expand these — they are expanded by init-project.sh at init time. The template
+  itself keeps them unexpanded. SYNC RULE: the bundled .claude/hooks/ and
+  .claude/skills/ are TOKENIZED copies of a maintainer's live versions — when
+  syncing a newer script version in, re-tokenize any duo-specific file
+  extensions back to the {{AI}}ai / hey{{HUMAN}} tokens (and keep wording
+  duo-neutral) before committing, or stamped repos inherit someone else's names.
+continuity: "This repo is TEMPLATE status in the workspace ROSTER — read-only unless updating a fleet-wide standard. Substrate packs live in stacks/; workspace-level canonical skill copies are deployed per workspace/SETUP.md (repos symlink to those, not to this repo). validate-substrate and the standard lefthook hooks here are the authoritative pattern source. This waystone describes the TEMPLATE repo itself — init-project.sh deletes it at bootstrap."
+validation: "bash -n init-project.sh && bash .claude/skills/validate-substrate/validate.sh"
+verified_at: "c36d908"
 actors:
-  cloud: write    # Claude maintains the template standards
-  chloe-local: read
-  codex: none
+  maintainer-ai: write   # the AI maintaining the template standards
+  other-agents: read
 boot_path:
   - init-project.sh          # the stamper — how a new repo is initialized from this template
   - CLAUDE.md                # the Tier-1 path-rule table that all projects inherit

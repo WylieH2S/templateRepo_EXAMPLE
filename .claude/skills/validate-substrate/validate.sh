@@ -33,28 +33,23 @@ fi
 echo "Validating substrate in: $(pwd)"
 [ "$TEMPLATE_MODE" -eq 1 ] && echo "(template mode — init-project.sh detected)"
 
-# Resolve a substrate filename, honoring template-mode placeholder names: in
-# TEMPLATE_MODE the AI-file extension is still the unfilled placeholder, so
-# NAME.chloeai exists as NAME.{{AI}}ai (and WORKSHEET.heywy as
-# WORKSHEET.hey{{HUMAN}}). Echoes whichever variant exists; rc=1 if neither.
-# This is what lets the template itself validate 0-fails and serve as the
-# boot-contract conformance oracle (ADR-BOOT-001).
+# Resolve a substrate filename. The AI-file extension in this script is the
+# per-duo placeholder token (ADR-009) that init-project.sh expands at
+# bootstrap; the script itself is substituted in the same pass, so the name it
+# checks always matches what is on disk — in template mode (token unexpanded,
+# files carry the token name) AND post-init (both expanded). Echoes the
+# filename if present; rc=1 if missing. Kept as a function so any future
+# naming-variant logic only has to change one place. This is what lets the
+# template itself validate 0-fails and serve as the boot-contract conformance
+# oracle (ADR-BOOT-001).
 resolve_file() {
   if [ -f "$1" ]; then printf '%s' "$1"; return 0; fi
-  if [ "$TEMPLATE_MODE" -eq 1 ]; then
-    local alt=""
-    case "$1" in
-      *.chloeai) alt="${1%.chloeai}.{{AI}}ai" ;;
-      *.heywy)   alt="${1%.heywy}.hey{{HUMAN}}" ;;
-    esac
-    if [ -n "$alt" ] && [ -f "$alt" ]; then printf '%s' "$alt"; return 0; fi
-  fi
   return 1
 }
 
 # ── Tier 1 required files ─────────────────────────────────────
 section "Tier 1 required files"
-for f in CLAUDE.md STARTUP_AI.chloeai readme_AI.chloeai ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/START_HERE.md; do
+for f in CLAUDE.md STARTUP_AI.{{AI}}ai readme_AI.{{AI}}ai ai_context/ai_rules.{{AI}}ai ai_context/glossary.{{AI}}ai ai_context/START_HERE.md; do
   if found=$(resolve_file "$f"); then
     pass "$found"
   else
@@ -67,10 +62,10 @@ section "ai_modules/"
 HI_MODE_FILE=""
 if [ -d ai_modules ]; then
   pass "ai_modules/ directory"
-  if HI_MODE_FILE=$(resolve_file ai_modules/hi_mode.chloeai); then
+  if HI_MODE_FILE=$(resolve_file ai_modules/hi_mode.{{AI}}ai); then
     pass "$HI_MODE_FILE"
   else
-    fail "ai_modules/hi_mode.chloeai (missing — HI Mode shim required)"
+    fail "ai_modules/hi_mode.{{AI}}ai (missing — HI Mode shim required)"
   fi
 else
   fail "ai_modules/ (missing — required for HI Mode shim)"
@@ -91,13 +86,13 @@ if [ -n "$HI_MODE_FILE" ]; then
       fail "EXTENDS path not found: $extends_raw (expanded: $extends_path) — central charter missing or moved"
     fi
   else
-    warn "hi_mode.chloeai has no EXTENDS line"
+    warn "hi_mode.{{AI}}ai has no EXTENDS line"
   fi
 fi
 
 # ── Path-scoped rules ─────────────────────────────────────────
 section "Path-scoped rules (.claude/rules/)"
-for f in code.chloeai tests.chloeai ai-context.chloeai docs.chloeai; do
+for f in code.{{AI}}ai tests.{{AI}}ai ai-context.{{AI}}ai docs.{{AI}}ai; do
   path=".claude/rules/$f"
   if found=$(resolve_file "$path"); then
     pass "$found"
@@ -107,7 +102,7 @@ for f in code.chloeai tests.chloeai ai-context.chloeai docs.chloeai; do
 done
 
 # ── Agent Boot Contract (ADR-BOOT-001) ────────────────────────
-# Conformance per .repo-manager/standards/boot-contract/BOOT-CONTRACT.chloeai.
+# Conformance per .repo-manager/standards/boot-contract/BOOT-CONTRACT.{{AI}}ai.
 # R1 (STARTUP_AI capsule present → FAIL) is enforced by the Tier-1 loop above.
 # R2  CLAUDE.md + AGENTS.md must name STARTUP_AI as the bootstrap    → FAIL
 # R3  START_HERE.md must not present a competing "Boot Sequence"     → WARN
@@ -162,9 +157,9 @@ fi
 # ── Hygiene ───────────────────────────────────────────────────
 section "Hygiene"
 [ -f .gitignore ] && pass ".gitignore" || fail ".gitignore (missing)"
-if found=$(resolve_file AI_HANDOFF.chloeai); then pass "$found"; else warn "AI_HANDOFF.chloeai (missing — OK for very new repos)"; fi
-if found=$(resolve_file WORKSHEET.heywy); then pass "$found"; else warn "WORKSHEET.heywy (missing)"; fi
-if found=$(resolve_file SIDEQUESTS.chloeai); then pass "$found"; else warn "SIDEQUESTS.chloeai (missing)"; fi
+if found=$(resolve_file AI_HANDOFF.{{AI}}ai); then pass "$found"; else warn "AI_HANDOFF.{{AI}}ai (missing — OK for very new repos)"; fi
+if found=$(resolve_file WORKSHEET.hey{{HUMAN}}); then pass "$found"; else warn "WORKSHEET.hey{{HUMAN}} (missing)"; fi
+if found=$(resolve_file SIDEQUESTS.{{AI}}ai); then pass "$found"; else warn "SIDEQUESTS.{{AI}}ai (missing)"; fi
 
 # ── Tracked junk ──────────────────────────────────────────────
 section "Tracked junk check"
@@ -215,7 +210,7 @@ fi
 section "Freshness"
 ninety_days_ago=$(date -v-90d +%s 2>/dev/null || date -d "90 days ago" +%s)
 
-for f in ai_context/current_state.md AI_HANDOFF.chloeai readme_AI.chloeai; do
+for f in ai_context/current_state.md AI_HANDOFF.{{AI}}ai readme_AI.{{AI}}ai; do
   if [ -f "$f" ]; then
     mtime=$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)
     if [ "$mtime" -lt "$ninety_days_ago" ]; then
@@ -228,18 +223,18 @@ done
 
 # ── Size sanity ───────────────────────────────────────────────
 section "Size sanity"
-if [ -f AI_HANDOFF.chloeai ]; then
-  size=$(wc -c < AI_HANDOFF.chloeai)
+if [ -f AI_HANDOFF.{{AI}}ai ]; then
+  size=$(wc -c < AI_HANDOFF.{{AI}}ai)
   if [ "$size" -gt 204800 ]; then
-    warn "AI_HANDOFF.chloeai is $((size / 1024)) KB — consider rotating older entries to an archive (threshold 200 KB)"
+    warn "AI_HANDOFF.{{AI}}ai is $((size / 1024)) KB — consider rotating older entries to an archive (threshold 200 KB)"
   else
-    pass "AI_HANDOFF.chloeai size OK"
+    pass "AI_HANDOFF.{{AI}}ai size OK"
   fi
 fi
 if [ -f ai_context/current_state.md ]; then
   size=$(wc -c < ai_context/current_state.md)
   if [ "$size" -gt 51200 ]; then
-    warn "ai_context/current_state.md is $((size / 1024)) KB — consider rotating older deltas to readme_AI_archive.chloeai (threshold 50 KB)"
+    warn "ai_context/current_state.md is $((size / 1024)) KB — consider rotating older deltas to readme_AI_archive.{{AI}}ai (threshold 50 KB)"
   else
     pass "ai_context/current_state.md size OK"
   fi
@@ -254,7 +249,7 @@ fi
 # Additive + graceful: a repo with no waystones passes. Reuses the schema's
 # reference bash extractors (owns/actors) so the parse stays gate-consistent.
 section "WISL waystone structure"
-waystones=$(find . -name '_waystone.chloeai' -not -path '*/.git/*' 2>/dev/null | sed 's|^\./||')
+waystones=$(find . -name '_waystone.{{AI}}ai' -not -path '*/.git/*' 2>/dev/null | sed 's|^\./||')
 if [ -z "$waystones" ]; then
   pass "No waystones present (WISL not adopted here — skipping)"
 else

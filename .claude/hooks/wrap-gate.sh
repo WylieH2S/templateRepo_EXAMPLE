@@ -13,8 +13,8 @@
 # repo-manager memory feedback-mechanize-every-skippable-edge.
 #
 # Handoff carrier (auto-detected, mirrors handoff-gate.sh):
-#   <repo>/readme_AI.chloeai                          present → in-repo session
-#   <repo>/.claude/skills/hi-mode/HANDOFF_LOG.chloeai else    → workspace session
+#   <repo>/readme_AI.{{AI}}ai                          present → in-repo session
+#   <repo>/.claude/skills/hi-mode/HANDOFF_LOG.{{AI}}ai else    → workspace session
 #
 # Three checks, all against the git repo containing this hook (resolved from the
 # script's own physical path, so it works from any cwd / the non-git parent):
@@ -37,11 +37,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)" || SCR
 R="$(git -C "${SCRIPT_DIR:-.}" rev-parse --show-toplevel 2>/dev/null)"
 [ -z "$R" ] && exit 0   # not in a git repo — nothing to gate
 
+# Fetch from origin silently — keeps refs current for the behind-origin check below.
+# (No-op when offline or no remote; always exits 0.)
+git -C "$R" fetch --quiet origin 2>/dev/null || true
+
 # --- detect this repo's HANDOFF carrier (in-repo readme_AI vs workspace log) ---
-if [ -f "$R/readme_AI.chloeai" ]; then
-  HB_PATH="readme_AI.chloeai"
-elif [ -f "$R/.claude/skills/hi-mode/HANDOFF_LOG.chloeai" ]; then
-  HB_PATH=".claude/skills/hi-mode/HANDOFF_LOG.chloeai"
+if [ -f "$R/readme_AI.{{AI}}ai" ]; then
+  HB_PATH="readme_AI.{{AI}}ai"
+elif [ -f "$R/.claude/skills/hi-mode/HANDOFF_LOG.{{AI}}ai" ]; then
+  HB_PATH=".claude/skills/hi-mode/HANDOFF_LOG.{{AI}}ai"
 else
   HB_PATH=""
 fi
@@ -68,7 +72,7 @@ if git -C "$R" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&
   unpushed=$(git -C "$R" log '@{u}..HEAD' --format='%h %s' 2>/dev/null || true)
   if [ -n "$unpushed" ]; then
     n=$(printf '%s\n' "$unpushed" | grep -c .)
-    details+="  • ${n} unpushed commit(s) — off-box backup stale; push on Wy's go."$'\n'
+    details+="  • ${n} unpushed commit(s) — off-box backup stale; push on the owner's go."$'\n'
     issues=$((issues + 1))
   fi
 fi
@@ -83,6 +87,15 @@ if [ -n "$dirty" ]; then
   issues=$((issues + 1))
 fi
 
+# 4. behind-origin (fetch above makes this accurate; a pull is needed if non-zero)
+if git -C "$R" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+  _behind=$(git -C "$R" rev-list 'HEAD..@{u}' --count 2>/dev/null || echo 0)
+  if [ -n "$_behind" ] && [ "$_behind" -gt 0 ]; then
+    details+="  • ${_behind} commit(s) behind origin — run git pull (HANDOFF carrier may be stale)."$'\n'
+    issues=$((issues + 1))
+  fi
+fi
+
 note=""
 [ "$src" = "compact" ] && note=" (post-compaction re-entry)"
 
@@ -91,6 +104,6 @@ if [ "$issues" -eq 0 ]; then
 else
   echo "⚠ WRAP gate${note}: ${issues} unresolved item(s) in $(basename "$R") — a prior session may not have wrapped:"
   printf '%s' "$details"
-  echo "   → Resolve before the first non-read action: append the HANDOFF block, commit, push on Wy's go (HI Mode SESSION WRAP)."
+  echo "   → Resolve before the first non-read action: append the HANDOFF block, commit, push on the owner's go (HI Mode SESSION WRAP)."
 fi
 exit 0
