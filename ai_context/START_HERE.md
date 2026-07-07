@@ -90,6 +90,33 @@ Two custom file types exist in this project:
 
 Any AI reading this repo should recognize both file types.
 
+A third file type may appear as the project grows:
+
+- **`_waystone.{{AI}}ai`** -- a WISL boot card: folder-local orientation (orient /
+  owns / risk / boot_path / actors) placed at an **AI-job seam** — a point where
+  work crosses between AI jobs (a task routed into a folder, a contract one job
+  produces and another consumes, a cloud↔local↔codex handoff).
+
+### WISL waystones — when and how
+
+This repo starts with **no waystones — that is correct.** Do not scaffold them.
+A waystone is authored with judgment when a *nameable* seam emerges, not per
+folder (blanket cards are low-signal and carry freshness-upkeep cost; a
+competent grep already ties them on recall — the standard's own measurement).
+
+When you author one:
+
+1. Follow the schema + parse contract at the workspace canonical:
+   `~/GitHub/.repo-manager/standards/WISL/` (`WISL-STANDARD.{{AI}}ai` +
+   `waystone.schema.{{AI}}ai` live there as `.chloeai` — the standard is
+   workspace-owned, duo-neutral in content).
+2. Register the card in the workspace seam map + `seam-coverage.tsv` **in the
+   same arc** — the drift-sweep `seam-coverage` gate enforces declared cards;
+   unrecorded cards are how coverage accounting drifts.
+3. Re-stamp discipline: the drift-sweep `waystone-freshness` gate (already armed
+   in this repo's `lefthook.yml`) requires the waystone to be re-stamped **in the
+   same commit** as any change to files it `owns`.
+
 ---
 
 ## Session Handoff Protocol

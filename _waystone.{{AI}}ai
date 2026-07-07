@@ -21,7 +21,7 @@ risk: >-
   duo-neutral) before committing, or stamped repos inherit someone else's names.
 continuity: "This repo is TEMPLATE status in the workspace ROSTER — read-only unless updating a fleet-wide standard. Substrate packs live in stacks/; workspace-level canonical skill copies are deployed per workspace/SETUP.md (repos symlink to those, not to this repo). validate-substrate and the standard lefthook hooks here are the authoritative pattern source. This waystone describes the TEMPLATE repo itself — init-project.sh deletes it at bootstrap."
 validation: "bash -n init-project.sh && bash .claude/skills/validate-substrate/validate.sh"
-verified_at: "c36d908"
+verified_at: "b17032c"
 actors:
   maintainer-ai: write   # the AI maintaining the template standards
   other-agents: read

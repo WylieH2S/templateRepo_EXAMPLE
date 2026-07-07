@@ -100,6 +100,16 @@ esac
 echo
 echo "Stack: ${STACK_DISPLAY}"
 
+# ── Remove the template's own waystone ────────────────────────────────────────
+# The root _waystone.{{AI}}ai describes the TEMPLATE repo (propagation traps,
+# token conventions) — wrong content for a stamped project. New repos start with
+# NO waystones by design: WISL cards are authored with judgment when a real
+# AI-job seam emerges (see ai_context/START_HERE.md §WISL waystones).
+if [[ -f '_waystone.{{AI}}ai' ]]; then
+  rm -- '_waystone.{{AI}}ai'
+  echo "Removed the template's root waystone (author project waystones only at real seams)."
+fi
+
 # ── Rename placeholder-extension files to the per-duo extensions ─────────────
 # stacks/ is renamed at copy time below; workspace/ is a separate deploy path
 # (see workspace/SETUP.md) and keeps its placeholders.
