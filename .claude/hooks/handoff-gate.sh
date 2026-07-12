@@ -30,11 +30,12 @@ raw_model=$(printf '%s' "$input" \
   | grep -oE '"model"[[:space:]]*:[[:space:]]*"[^"]*"' \
   | head -1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')
 
-normalize() {  # claude-opus-4-8 → opus, *sonnet* → sonnet, *haiku* → haiku
+normalize() {  # claude-opus-4-8 → opus, *sonnet* → sonnet, *haiku* → haiku, *fable*/*mythos* → fable
   case "$1" in
     *opus*)   echo opus ;;
     *sonnet*) echo sonnet ;;
     *haiku*)  echo haiku ;;
+    *fable*|*mythos*) echo fable ;;
     *)        echo "$1" ;;
   esac
 }
