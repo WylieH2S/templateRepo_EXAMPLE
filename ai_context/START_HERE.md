@@ -116,6 +116,20 @@ When you author one:
 3. Re-stamp discipline: the drift-sweep `waystone-freshness` gate (already armed
    in this repo's `lefthook.yml`) requires the waystone to be re-stamped **in the
    same commit** as any change to files it `owns`.
+4. If the card you author is the **repo-root** card, give it a `heywy:` block and
+   restore the doorway so {{HUMAN}} can read it:
+
+       ln -s ../.claude/waystone/heywy _waystone.hey{{HUMAN}}
+
+   `heywy:` is the human inscription (WISL-STANDARD §Human inscription, ADR-015):
+   `what` / `state` / `run` / `check` / `next`, in plain language, as the **last**
+   frontmatter key. `_waystone.hey{{HUMAN}}` is a symlink to one canonical
+   renderer — never content — and `init-project.sh` removed it at bootstrap
+   precisely because there was no root card yet for it to land on.
+
+   The honesty rule is load-bearing: say what the `validation:` command actually
+   proves *and what it does not*. "Scaffold only, nothing runs yet" is a correct
+   `state`. A directory-existence check must never read as a passing test suite.
 
 ---
 

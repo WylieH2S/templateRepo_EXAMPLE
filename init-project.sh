@@ -109,6 +109,12 @@ if [[ -f '_waystone.{{AI}}ai' ]]; then
   rm -- '_waystone.{{AI}}ai'
   echo "Removed the template's root waystone (author project waystones only at real seams)."
 fi
+# The heywy doorway lands on a root card, so it goes with it — a symlink pointing at
+# an inscription that does not exist is clutter, not a feature. START_HERE §WISL
+# waystones documents the one-line command that restores it alongside a real root card.
+if [[ -L '_waystone.hey{{HUMAN}}' || -e '_waystone.hey{{HUMAN}}' ]]; then
+  rm -- '_waystone.hey{{HUMAN}}'
+fi
 
 # ── Rename placeholder-extension files to the per-duo extensions ─────────────
 # stacks/ is renamed at copy time below; workspace/ is a separate deploy path

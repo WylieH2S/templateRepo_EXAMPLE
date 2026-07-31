@@ -31,6 +31,22 @@ boot_path:
   - lefthook.yml             # standard pre-commit hooks (drift-sweep, validate-substrate, no-secrets)
   - ai_context/              # substrate scaffold (decisions/, glossary, ai_rules, START_HERE)
   - stacks/                  # optional stack packs (Swift, TS, Python, GBC) — pulled in at init
+heywy:
+  what: >-
+    Not a project — the mould every new project is stamped from. When you start a repo,
+    init-project.sh copies this one and fills in the names.
+  state: >-
+    Maintained, and it is the conformance oracle: it validates with zero failures under its
+    own copy of the checker, which is how the fleet knows the checker itself is right.
+  run: >-
+    ./init-project.sh in a fresh copy — it asks for the project and AI names, renames the
+    placeholder files, and deletes itself.
+  check: >-
+    Validates the substrate structure. A pass means a repo stamped from here starts
+    conformant. It runs no application code, because there is none.
+  next: >-
+    Nothing pending. Edit here only when you want ALL future repos to change — existing
+    repos do not update themselves from this.
 ---
 This is the pattern source, not an active project.
 
