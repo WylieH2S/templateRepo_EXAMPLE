@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.11 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.12 — detect code/substrate drift in a repo.
+#
+# v0.1.12 (SESSION-085, 2026-08-06): waystone-validity also checks the heywy DOORWAY.
+# A root card with a `heywy:` inscription is written for a human; ./_waystone.heywy
+# is how it gets read. The workspace root carried an inscription and no doorway for
+# weeks and nothing noticed. Folded into waystone-validity rather than given its own
+# category so it inherits an already-armed gate — validate-substrate runs in NO
+# lefthook fleet-wide, so a check there would have been inert.
 #
 # v0.1.11 (SESSION-085, 2026-08-06): NEW waystone-validity category — does the
 # card actually PARSE? Every other WISL gate is a grep/awk extractor and presumes
@@ -605,6 +612,32 @@ else
     esac
   done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   [ "$wv_found" -eq 0 ] && pass "no waystones present (WISL not adopted in this repo)"
+fi
+
+# ── 9a. heywy doorway presence (v0.1.12) ──────────────────────
+# A root card carrying a `heywy:` inscription is written for a HUMAN to read, and
+# the way it gets read is `./_waystone.heywy`. If that doorway is missing the
+# inscription is unreachable from where the reader stands.
+#
+# WHY (SESSION-085): the workspace root card had a full heywy block written for Wy
+# since ADR-015 and NO doorway — he went to ~/GitHub to read it and found nothing.
+# All 11 repos had one; the one place he actually stands to see the whole fleet did
+# not. Nothing anywhere checked, which is why it survived. Folded into
+# waystone-validity rather than given its own category so it inherits an ALREADY
+# ARMED gate — validate-substrate would have been the tidier home but runs in no
+# lefthook at all, so a check there would have been inert. Same lesson as the rest
+# of this file: a gate nothing triggers is not a gate.
+if [ -f _waystone.chloeai ] && grep -qE '^heywy:' _waystone.chloeai 2>/dev/null; then
+  # The template ships a tokenized name (_waystone.hey{{HUMAN}}) until init substitutes it.
+  if ls _waystone.heywy >/dev/null 2>&1 || ls _waystone.hey*'}' >/dev/null 2>&1; then
+    if [ -e _waystone.heywy ] || ls _waystone.hey*'}' >/dev/null 2>&1; then
+      pass "heywy doorway present (the inscription is reachable)"
+    else
+      fail "heywy doorway DANGLES: _waystone.heywy exists but resolves to nothing — the inscription is unreadable"
+    fi
+  else
+    fail "heywy doorway MISSING: this root card carries a heywy: inscription written for a human, but no ./_waystone.heywy exists to read it through"
+  fi
 fi
 
 # ── 9b. WISL waystone freshness (v0.1.8: recency-based, staged-aware, lag-free) ──
