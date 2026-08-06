@@ -55,7 +55,7 @@ pre-commit:
     # git-native, so it fires for ANY committing agent (Claude, Codex, …).
     # Orphans and mission-freshness are advisory only — run full sweep manually to review.
     drift-sweep:
-      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,wrap-continuity
+      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,wrap-continuity
 
     # Warn on direct main commits (override with --no-verify if intentional)
     not-on-main:
