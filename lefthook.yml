@@ -69,6 +69,14 @@ pre-commit:
 pre-push:
   parallel: true
   commands:
+    # The blocking half of the backstop (SESSION-085). `--no-verify` on `git commit`
+    # does NOT skip pre-push, so a locally-bypassed commit is still caught before it
+    # reaches origin — the exact DEC-103 pattern. Closes SL-001 residual #1, open
+    # since June: "the arm is pre-commit only, with no push-time backstop".
+    # Honest limit: `git push --no-verify` still skips this. The nightly fleet-sweep
+    # in repoManager is what catches a determined bypass.
+    drift-sweep-push:
+      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,wrap-continuity
     # Prevent force-pushes to main/master without explicit ack
     no-force-push-main:
       run: |
