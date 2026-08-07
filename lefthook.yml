@@ -50,12 +50,17 @@ pre-commit:
 
     # Drift sweep — catches probe journals in file headers, untracked audit docs,
     # and uncommitted churn before it accumulates into hard-to-review bulk.
-    # Gated subset: working-tree, untracked-docs, file-journals, wrap-continuity.
+    # Gated subset: working-tree, untracked-docs, file-journals, waystone-validity,
+    # waystone-freshness, wrap-continuity.
+    # waystone-validity asks whether a card PARSES; waystone-freshness (armed
+    # 2026-08-07) asks whether it was re-stamped when the files it owns changed.
+    # Both graceful-pass where no _waystone.chloeai exists, so a stamped repo with
+    # no WISL cards yet inherits them inert rather than broken.
     # wrap-continuity is the Agent Boot Contract W1 write-edge arm (ADR-BOOT-001) —
     # git-native, so it fires for ANY committing agent (Claude, Codex, …).
     # Orphans and mission-freshness are advisory only — run full sweep manually to review.
     drift-sweep:
-      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,wrap-continuity
+      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,waystone-freshness,wrap-continuity
 
     # Warn on direct main commits (override with --no-verify if intentional)
     not-on-main:
@@ -76,7 +81,7 @@ pre-push:
     # Honest limit: `git push --no-verify` still skips this. The nightly fleet-sweep
     # in repoManager is what catches a determined bypass.
     drift-sweep-push:
-      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,wrap-continuity
+      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,waystone-freshness,wrap-continuity
     # Prevent force-pushes to main/master without explicit ack
     no-force-push-main:
       run: |
