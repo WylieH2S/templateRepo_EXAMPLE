@@ -1,5 +1,108 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.12 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.15 — detect code/substrate drift in a repo.
+#
+# v0.1.17 (SESSION-089, 2026-08-09): probe-journal-in-diff exempts .claude/skills/
+# — canonical tool headers carry a curated changelog, not iteration noise, and the
+# check only ever fired on the template's sync path. See the exemption comment inline.
+#
+# v0.1.16 (SESSION-089, 2026-08-09): NEW hook-canonical category — nothing was
+# watching the hooks.
+#
+# handoff-gate.sh was found forked in ALL ELEVEN repos, in three distinct stale
+# versions, none of which had followed THR-020/ADR-012's 2026-07-23 rename of
+# recommended_model= to recommended_capability=. The charter's B3 capability
+# STOP-THE-LINE was therefore dead fleet-wide for ~17 days. It was invisible because
+# the stale hook reported "no recommended_model= — skipping", and a skip is
+# indistinguishable from a pass unless you go read the script.
+#
+# THE ASYMMETRY THAT EXPLAINS IT. Two artifacts live in .claude/. Skills are
+# SYMLINKS to the workspace canonical and have never drifted. Hooks were COPIES and
+# drifted into three versions. Same directory, same authors, same fleet — the only
+# difference was the invariant. Hooks are now symlinked too; this check is the
+# backstop for what a symlink cannot cover: a repo that de-symlinks, and
+# templateRepo_EXAMPLE, which must hold real files because it ships {{AI}}
+# placeholders substituted at seed time.
+#
+# Ladder: linked to canonical (-ef) → pass; byte-identical after {{AI}} substitution
+# → pass (template); byte-identical unlinked COPY → WARN, because that is exactly the
+# state the fleet was in before it rotted; anything else → soft_fail. Graceful pass
+# when no canonical is reachable, same dangle posture as the symlinked skill.
+#
+# v0.1.15 (SESSION-087, 2026-08-07): BRANCH VISIBILITY + boot-source deliverability.
+#
+# THE BRANCH GAP. Twice in one session a commit landed on an unexpected branch —
+# substrate onto OperationFarmstock's assembly-viewer branch, card curation onto
+# PocketLink's m14 branch — both because the session checked `git status` and never
+# `git branch`. Status cannot surface this: it reports a clean tree on the WRONG
+# branch exactly as happily as on the right one. Flagging it in a handoff did not
+# prevent the second occurrence, which makes it a mechanism gap rather than an
+# attention problem. Two layers: (1) the sweep header now always prints BRANCH, and
+# marks it when it is not the default — this survives --quiet, so it appears at every
+# pre-commit in every repo, at the moment the mistake is made rather than at boot;
+# (2) a `branch-context` WARN when repo-GOVERNING files (lefthook.yml, .claude/**,
+# CLAUDE.md, AGENTS.md, STARTUP_AI) are staged off the default branch, where they stay
+# inert until merge. Deliberately not a blanket "you are on a branch" warning (fires on
+# every feature commit, tuned out in a day) and deliberately excluding _waystone cards
+# (freshness REQUIRES them to move with owned code on feature branches — warning on
+# them would punish behaviour another gate mandates).
+#
+# BOOT-SOURCE DELIVERABILITY. Which declared boot sources are physically too large to
+# ever arrive whole? The packet allocates max_chars // max_files per entry, so a file
+# above that ceiling is ALWAYS truncated — and a truncated file reads exactly like a
+# complete one unless the caller checks the warning. Neither existing size check can
+# see this: tier1-bloat warns at 25 KB while the per-entry share is 4,096 (they
+# disagree by 6x, so a 17 KB always-loaded doc passes tier1-bloat while delivering 23%
+# of itself forever — PocketLink's CURRENT_MISSION.md, found exactly this way), and
+# seam-coverage does not look at sizes at all. REPORT-ONLY: over-cap is not always
+# wrong, since some files are essential AND big, and the fix there is to shrink the
+# FILE rather than stop declaring it.
+#
+# v0.1.14 (SESSION-087, 2026-08-07): NEW FILES ARE NO LONGER COUNTED AS CHURN, and
+# NEW ownership-coverage category (REPORT-ONLY).
+#
+# THE CHURN FIX. `working-tree` targets ITERATIVE accumulation — one file edited over
+# and over uncommitted, where the record of each iteration is what is lost. But
+# `git diff --shortstat HEAD` counts a new file's ENTIRE BODY as insertions, so ADDING
+# read identically to CHURNING. That made the gate unsatisfiable rather than strict:
+# a single 1,149-line stylesheet cannot be split, so the smallest commit containing it
+# was already over threshold and --no-verify was STRUCTURALLY REQUIRED for honest work.
+# The gate was manufacturing the bypass habit it exists to prevent (DEC-103). Added
+# files are now excluded from the threshold and reported on their own line — the same
+# treatment lockfiles already had. Verified both directions: a new 1,149-line file
+# passes; churning that same file by 1,149 lines still FAILS at 2,298.
+#
+# OWNERSHIP COVERAGE. Ratifies seam-coverage-definition.chloeai §4. `seam-coverage`
+# compares two hand-maintained lists and reports their agreement — it cannot see a
+# folder nobody declared. This measures what share of tracked source falls under SOME
+# card's `owns`, derived from the cards plus git with no hand-maintained input. Fleet
+# baseline at adoption: 23% (OperationFarmstock 0 of 54, Planitaria 5%, PocketLink 6%,
+# planTheBeast 49%, TFNerd 94%) against the old metric's 100%. REPORT-ONLY, per §5.
+#
+# v0.1.13 (SESSION-087, 2026-08-07): SPLIT the overloaded verified_at, and two new
+# REPORT-ONLY categories.
+#
+# THE SPLIT. `verified_at` meant two different things at once — "the validation:
+# command passed" and "a human re-read this folder and confirms owns still describes
+# it" — and only the second is what the freshness gate reports. That overload is why
+# auto-stamping kept looking attractive: it would have killed the re-stamp tax
+# (OperationFarmstock burned five commits doing nothing else) by quietly downgrading
+# what the stamp CERTIFIES, leaving a gate that says "a human checked" when a script
+# ran. Now: `reviewed_at` is the human stamp and the gate prefers it, falling back to
+# `verified_at`, which is permanently supported — NO card needs migrating, and every
+# existing card keeps working untouched. `validated_at` is the machine stamp, safe to
+# auto-stamp because it claims only that a script exited 0, and the freshness gate
+# never reads it. Verified all three paths on a scratch repo before shipping:
+# reviewed_at preferred, verified_at fallback, neither -> FAIL + exit 1.
+#
+# NEW continuity-age category, REPORT-ONLY.
+# `continuity:` is the prose that tells the next agent what a folder's story is, and
+# nothing ever timestamped it — `verified_at` certifies the OWNS globs were reconciled
+# with the code, which is a different claim, and the two drift apart in both directions.
+# Emits `pass` lines only: no warn, no fail, no --fail-on token, no threshold, and
+# nothing at all under --quiet (so no lefthook gets noisier). Deliberately inert while
+# ages accumulate across the fleet — a guessed threshold produces a gate that fires
+# wrong, and one that fires wrong gets ignored. Arm it from data, not from a number
+# that felt right. Same rollout discipline as seam-coverage-definition.chloeai §5.
 #
 # v0.1.12 (SESSION-085, 2026-08-06): waystone-validity also checks the heywy DOORWAY.
 # A root card with a `heywy:` inscription is written for a human; ./_waystone.heywy
@@ -253,6 +356,25 @@ section() {
 
 if [ "$JSON_OUTPUT" -eq 0 ]; then
   echo "Drift-sweep in: $(pwd)"
+  # BRANCH IS PART OF "WHERE YOU ARE" (v0.1.15). Twice in one session a commit landed
+  # on an unexpected branch because the session checked `git status` and never
+  # `git branch` — and status reports a clean tree on the WRONG branch exactly as
+  # happily as on the right one, so it can never surface this. Printed here rather
+  # than in a SessionStart banner because the mistake is made when you cd into a repo
+  # mid-session and commit, not at boot; this line appears at every pre-commit, in
+  # every repo, and survives --quiet.
+  if [ -d .git ]; then
+    _br=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+    # origin/HEAD is the real answer where it exists; fall back rather than assume.
+    _def=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+    [ -z "$_def" ] && _def=$(git config --get init.defaultBranch 2>/dev/null)
+    [ -z "$_def" ] && _def="main"
+    if [ -n "$_br" ] && [ "$_br" != "$_def" ]; then
+      echo "  BRANCH: ${_br}   <-- NOT the default (${_def})"
+    else
+      echo "  BRANCH: ${_br}"
+    fi
+  fi
   echo "  CODE_ROOTS: ${CODE_ROOTS}"
   [ -n "$EXCLUDE_FILES" ] && echo "  EXCLUDE_FILES: ${EXCLUDE_FILES}"
 fi
@@ -278,6 +400,28 @@ if [ -d .git ]; then
   for lockfile in $CHURN_EXCLUDE_LOCKFILES; do
     churn_pathspec+=(":(exclude)${lockfile}" ":(exclude,glob)**/${lockfile}")
   done
+  # NEW FILES ARE NOT CHURN (v0.1.14). This rule targets ITERATIVE accumulation —
+  # the same file edited over and over without a commit, where the record of each
+  # iteration is what gets lost. But `git diff --shortstat HEAD` counts a brand-new
+  # file's ENTIRE BODY as insertions, so ADDING a file read identically to CHURNING
+  # one. That made the gate unsatisfiable rather than merely strict: a single
+  # 1,149-line stylesheet cannot be split, so the smallest possible commit
+  # containing it was already over threshold and `--no-verify` was STRUCTURALLY
+  # REQUIRED to commit legitimate work (SESSION-087, OperationFarmstock
+  # assembly_viewer). A gate that forces a bypass for honest work trains exactly the
+  # bypass habit that produced DEC-103 — the gate was manufacturing the behaviour it
+  # exists to prevent.
+  #
+  # Same treatment lockfiles already get: excluded from the THRESHOLD, still fully
+  # visible to the dirty-file count and reported on their own line below. Committing
+  # new work stays easy, which is the point — DEC-044 nearly lost an entire 3D model
+  # because untracked work sat in a working tree.
+  added_files=0
+  while IFS= read -r _added; do
+    [ -z "$_added" ] && continue
+    churn_pathspec+=(":(exclude)${_added}")
+    added_files=$((added_files+1))
+  done < <(git diff --name-only --diff-filter=A HEAD 2>/dev/null)
   shortstat=$(git diff --shortstat HEAD -- "${churn_pathspec[@]}" 2>/dev/null || true)
   insertions=0
   deletions=0
@@ -288,18 +432,34 @@ if [ -d .git ]; then
   total=$((insertions + deletions))
   dirty_count=$(git diff --name-only HEAD 2>/dev/null | wc -l | tr -d ' ')
 
+  # Annotates whichever branch fires — it must not REPLACE the dirty-file warning,
+  # which is a different signal and still owed to the caller.
+  added_note=""
+  [ "$added_files" -gt 0 ] && added_note=" [+${added_files} new file(s), not counted as churn]"
+
   if [ "$total" -gt "$DIFF_FAIL_THRESHOLD" ]; then
-    fail "uncommitted churn: ${total} lines across ${dirty_count} files (threshold ${DIFF_FAIL_THRESHOLD})"
+    fail "uncommitted churn: ${total} lines across ${dirty_count} files (threshold ${DIFF_FAIL_THRESHOLD}) — EDITS to existing files only${added_note}"
   elif [ "$dirty_count" -gt "$DIRTY_FILES_WARN" ]; then
-    warn "${dirty_count} files dirty in working tree (threshold ${DIRTY_FILES_WARN})"
+    warn "${dirty_count} files dirty in working tree (threshold ${DIRTY_FILES_WARN})${added_note}"
   else
-    pass "working tree healthy (${total} lines, ${dirty_count} files)"
+    pass "working tree healthy (${total} lines, ${dirty_count} files)${added_note}"
   fi
 
   # Probe-journal accumulation in any single file's diff.
+  #
+  # EXEMPTION (v0.1.17): files under .claude/skills/ are canonical TOOL sources
+  # whose headers carry a deliberate, curated changelog — sweep.sh's own header is
+  # the authoritative version history this repo points to. That is categorically
+  # different from the probe-iteration journaling this check exists to catch.
+  # In real repos those files are SYMLINKS and never appear in a diff at all, so
+  # the only place this ever fired was templateRepo_EXAMPLE, which must hold real
+  # copies — i.e. it fired exactly once per canonical sync and never on the thing
+  # it was designed to catch. Exempting the path removes that friction from the
+  # sync path without weakening the check anywhere it does real work.
   journal_diff_hits=0
   while IFS= read -r f; do
     [ -z "$f" ] || [ ! -f "$f" ] && continue
+    case "$f" in .claude/skills/*) continue ;; esac
     bump_count=$(git diff -- "$f" 2>/dev/null | grep -cE '^\+[[:space:]]*(//|#)[[:space:]]*v[0-9]+\.' || true)
     if [ "$bump_count" -gt "$JOURNAL_DIFF_LINES_FAIL" ]; then
       fail "probe-journal-in-diff: ${f} (+${bump_count} version-bump lines, threshold +${JOURNAL_DIFF_LINES_FAIL})"
@@ -658,14 +818,28 @@ if [ -d .git ]; then
   while IFS= read -r wf; do
     [ -z "$wf" ] || [ ! -f "$wf" ] && continue
     ws_found=1
-    # verified_at — quote-tolerant (schema friction #6: quoted to survive YAML int-parse)
-    sha=$(grep -oE '^verified_at:[[:space:]]*"?[0-9a-f]{7,40}"?' "$wf" | grep -oE '[0-9a-f]{7,40}' | head -1)
+    # The HUMAN reconciliation stamp — quote-tolerant (schema friction #6: quoted to
+    # survive YAML int-parse). `reviewed_at` is the clearer name and wins where present;
+    # `verified_at` is its permanently-supported predecessor, so no card needs migrating.
+    #
+    # v0.1.13 SPLIT: this field means A HUMAN RE-READ THIS FOLDER. It is deliberately
+    # NOT the place a machine records that the `validation:` command passed — that is
+    # `validated_at`, reported separately below and never read by this gate. The two
+    # were one overloaded field, which is why auto-stamping kept looking attractive:
+    # it would have killed the re-stamp tax by quietly downgrading what the stamp
+    # CERTIFIES, leaving a gate that says "a human checked" when a script ran.
+    ws_field="reviewed_at"
+    sha=$(grep -oE '^reviewed_at:[[:space:]]*"?[0-9a-f]{7,40}"?' "$wf" | grep -oE '[0-9a-f]{7,40}' | head -1)
     if [ -z "$sha" ]; then
-      fail "waystone ${wf}: no parseable verified_at (schema: 7–40 hex, quoted)"
+      ws_field="verified_at"
+      sha=$(grep -oE '^verified_at:[[:space:]]*"?[0-9a-f]{7,40}"?' "$wf" | grep -oE '[0-9a-f]{7,40}' | head -1)
+    fi
+    if [ -z "$sha" ]; then
+      fail "waystone ${wf}: no parseable reviewed_at or verified_at (schema: 7–40 hex, quoted)"
       continue
     fi
     if ! git cat-file -e "${sha}^{commit}" 2>/dev/null; then
-      fail "waystone ${wf}: verified_at ${sha} not in git history (dangling sha)"
+      fail "waystone ${wf}: ${ws_field} ${sha} not in git history (dangling sha)"
       continue
     fi
     # owns globs — flat parse (schema's bash extractor; no YAML dep on the gate path)
@@ -683,7 +857,7 @@ if [ -d .git ]; then
         pass "waystone fresh (re-stamped with this commit): ${wf}"
       else
         n=$(printf '%s\n' "$owned_staged" | grep -c .)
-        fail "waystone STALE: ${wf} — ${n} owned file(s) staged without re-stamping the waystone; re-read the folder, re-stamp verified_at, and stage it in this commit"
+        fail "waystone STALE: ${wf} — ${n} owned file(s) staged without re-stamping the waystone; re-read the folder, re-stamp ${ws_field}, and stage it in this commit"
       fi
     elif [ "$ws_staged" -eq 1 ]; then
       pass "waystone fresh (re-stamp staged): ${wf}"
@@ -692,13 +866,242 @@ if [ -d .git ]; then
       owned_last=$(git log -1 --format=%ct -- $globs ':(exclude)**/_waystone.chloeai' 2>/dev/null)
       ws_last=$(git log -1 --format=%ct -- "$wf" 2>/dev/null)
       if [ -n "$owned_last" ] && { [ -z "$ws_last" ] || [ "$owned_last" -gt "$ws_last" ]; }; then
-        fail "waystone STALE: ${wf} — owned file(s) committed more recently than the waystone (verified_at ${sha}); re-read the folder + re-stamp verified_at"
+        fail "waystone STALE: ${wf} — owned file(s) committed more recently than the waystone (${ws_field} ${sha}); re-read the folder + re-stamp ${ws_field}"
       else
-        pass "waystone fresh: ${wf} (verified_at ${sha})"
+        pass "waystone fresh: ${wf} (${ws_field} ${sha})"
       fi
     fi
   done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   [ "$ws_found" -eq 0 ] && pass "no waystones present (WISL not adopted in this repo)"
+fi
+
+# ── 9b. WISL continuity age (v0.1.13, REPORT-ONLY) ────────────
+# `continuity:` is the prose paragraph that tells the next agent what this folder's
+# story currently is. Nothing has ever timestamped it. `verified_at` certifies that
+# the OWNS globs were reconciled with the code — a different claim entirely, and the
+# two genuinely drift apart: code can sit still while the story about it goes stale,
+# and vice versa.
+#
+# DELIBERATELY REPORT-ONLY. This emits `pass` lines and nothing else: no warn, no
+# fail, no --fail-on token, no threshold. Under --quiet (how every lefthook invokes
+# this) it prints nothing at all, so it cannot make a commit noisy. The point is to
+# ACCUMULATE AGES across the fleet first and set a threshold from data — a guessed
+# number produces a gate that fires wrong, and a gate that fires wrong gets ignored.
+# See seam-coverage-definition.chloeai §5 for the same rollout discipline.
+#
+# The field is a QUOTED git sha, matching verified_at, not a hand-typed date: a sha
+# resolves to a real commit time and cannot be typo'd into a plausible-looking lie.
+# ── 8b. Branch context for gate/contract files (v0.1.15) ──────
+# The header above states the branch unconditionally. This is the targeted half: a
+# WARN when files that govern the WHOLE repo — the commit gates, the agent contracts,
+# the hooks — are being committed somewhere other than the default branch.
+#
+# Deliberately NOT a blanket "you are on a branch" warning, which would fire on every
+# feature commit and be tuned out within a day. And deliberately NOT including
+# _waystone.chloeai: the freshness gate REQUIRES a card to be re-stamped alongside the
+# owned code it describes, so cards legitimately move on feature branches constantly —
+# warning on them would punish the behaviour another gate mandates.
+#
+# soft_fail, so it stays a WARN: substrate on a branch is sometimes exactly right
+# (held-for-review work belongs on a branch, not in an untracked working tree). The
+# point is that it should be a DECISION, not something noticed three commits later.
+CURRENT_CATEGORY="branch-context"
+section "Branch context"
+if [ ! -d .git ]; then
+  pass "branch-context: not a git repo — skipping"
+else
+  bc_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  bc_default=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||')
+  [ -z "$bc_default" ] && bc_default=$(git config --get init.defaultBranch 2>/dev/null)
+  [ -z "$bc_default" ] && bc_default="main"
+  if [ -z "$bc_branch" ] || [ "$bc_branch" = "$bc_default" ] || [ "$bc_branch" = "HEAD" ]; then
+    pass "branch-context: on ${bc_branch:-detached} (default ${bc_default})"
+  else
+    bc_gov=$(git diff --cached --name-only 2>/dev/null \
+      | grep -E '^(lefthook\.yml|CLAUDE\.md|AGENTS\.md|STARTUP_AI\.chloeai|\.claude/)' || true)
+    if [ -n "$bc_gov" ]; then
+      bc_n=$(printf '%s\n' "$bc_gov" | grep -c .)
+      soft_fail "branch-context: ${bc_n} repo-governing file(s) staged on '${bc_branch}', not the default '${bc_default}' — these set the rules for EVERY commit here, so on a branch they stay inert until merge: $(printf '%s' "$bc_gov" | tr '\n' ' ')"
+    else
+      pass "branch-context: on '${bc_branch}' (default '${bc_default}'), no repo-governing files staged"
+    fi
+  fi
+fi
+
+# ── 9c. WISL ownership coverage (v0.1.14, REPORT-ONLY) ────────
+# What share of tracked source falls under SOME card's `owns` globs. Derived from the
+# cards plus git ls-files — NO hand-maintained input, which is the whole point and the
+# difference from `seam-coverage`. That category reads a hand-written tsv and asks
+# whether each declared folder still has a card: a deletion detector whose denominator
+# is editable by forgetting, structurally blind to a folder nobody ever declared. It
+# reported 100% for a fleet measured here at 23%. Both numbers are correct; only one
+# is called coverage. Full argument + the rejected alternatives:
+# .repo-manager/standards/WISL/seam-coverage-definition.chloeai (ACCEPTED §4).
+#
+# REPORT-ONLY per §5. A low ratio is not automatically a defect — `owns` scopes the
+# FRESHNESS gate, not orientation, and the repoManager root card deliberately excludes
+# high-churn session state. Accumulate real numbers before deciding whether a floor
+# means anything, and expect the answer to be a per-repo expected value rather than a
+# fleet threshold.
+CURRENT_CATEGORY="ownership-coverage"
+section "WISL ownership coverage (report-only)"
+if [ ! -d .git ]; then
+  pass "ownership-coverage: not a git repo — skipping"
+else
+  oc_globs=$(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null \
+    | xargs -I{} awk '/^owns:/{f=1;next} f&&/^[[:space:]]+-[[:space:]]/{sub(/^[[:space:]]+-[[:space:]]/,"");gsub(/"/,"");print;next} f&&/^[^[:space:]]/{f=0}' {} 2>/dev/null \
+    | sort -u)
+  if [ -z "$oc_globs" ]; then
+    pass "ownership-coverage: no waystones with owns globs (WISL not adopted here)"
+  else
+    # Same source definition drift-sweep uses elsewhere, minus vendored trees.
+    oc_src=$(git ls-files 2>/dev/null | grep -E "\.($(echo "$SOURCE_EXTENSIONS" | tr ' ' '|'))$" \
+             | grep -vE '(^|/)(node_modules|\.venv|dist|build|vendor|\.generated)/' || true)
+    oc_total=$(printf '%s\n' "$oc_src" | grep -c . || true)
+    if [ "$oc_total" -eq 0 ]; then
+      pass "ownership-coverage: no tracked source files to score"
+    else
+      # Both lists go through FILES, never `awk -v`: -v runs escape processing and
+      # cannot carry embedded newlines, which silently collapses a multi-line list to
+      # one record. Same trap already documented in .repo-manager/upsync-status.sh —
+      # and duly walked into again here before the empty result gave it away.
+      # FILENAME (not the NR==FNR idiom) selects the pass: NR==FNR is true for the
+      # first record of the SECOND file whenever the first file is empty.
+      oc_gf=$(mktemp); oc_sf=$(mktemp)
+      printf '%s\n' "$oc_globs" > "$oc_gf"
+      printf '%s\n' "$oc_src"   > "$oc_sf"
+      # `**` spans separators, `*` does not — the schema's documented glob intent.
+      oc_covered=$(awk -v gf="$oc_gf" '
+        FILENAME == gf {
+          if ($0 == "") next
+          pat = $0
+          gsub(/\./, "\\.", pat)
+          gsub(/\*\*/, "\002", pat)
+          gsub(/\*/, "[^/]*", pat)
+          gsub(/\002/, ".*", pat)
+          pats[++p] = "^" pat "$"
+          next
+        }
+        $0 != "" { for (j = 1; j <= p; j++) if ($0 ~ pats[j]) { hit++; break } }
+        END { print hit + 0 }' "$oc_gf" "$oc_sf")
+      rm -f "$oc_gf" "$oc_sf"
+      pass "ownership-coverage: ${oc_covered}/${oc_total} tracked source file(s) claimed by some card's owns ($(( oc_covered * 100 / oc_total ))%)"
+    fi
+  fi
+fi
+
+# ── 9d. Boot-source deliverability (v0.1.15, REPORT-ONLY) ─────
+# Which declared boot sources are physically too large to ever arrive whole?
+#
+# The context packet allocates max_chars // max_files per entry, so there is a hard
+# per-entry ceiling and a file above it is ALWAYS truncated — not on a bad day, not
+# under load, always. That is worth naming because a truncated file reads exactly like
+# a complete one unless the caller checks the warning, which makes an oversized Tier-1
+# doc a permanent source of false premises.
+#
+# The two existing size checks cannot see this. tier1-bloat warns at 25 KB, but the
+# per-entry share is 4,096 — they disagree by 6x, so a 17 KB always-loaded file passes
+# tier1-bloat while delivering 24% of itself forever. seam-coverage does not look at
+# sizes at all.
+#
+# REPORT-ONLY, because over-cap is not automatically wrong: some files are essential
+# AND big (a 27 KB charter), and the fix there is to shrink the FILE — rotate the log,
+# page the history — not to stop declaring it. This says which ones, and how little of
+# each actually lands.
+CURRENT_CATEGORY="boot-source-size"
+section "Boot-source deliverability (report-only)"
+if [ ! -d .git ]; then
+  pass "boot-source-size: not a git repo — skipping"
+else
+  bs_flagged=0
+  bs_cards=0
+  while IFS= read -r wf; do
+    [ -z "$wf" ] || [ ! -f "$wf" ] && continue
+    bs_entries=$(awk '/^boot_path:/{f=1;next} f&&/^[[:space:]]*-[[:space:]]/{sub(/^[[:space:]]*-[[:space:]]*/,"");sub(/[[:space:]]*#.*/,"");print;next} f&&/^[^[:space:]#]/{f=0}' "$wf")
+    [ -z "$bs_entries" ] && continue
+    bs_cards=$((bs_cards+1))
+    # Mirrors default_budget: an all-waystone boot_path is an INDEX card and gets 8
+    # slots (breadth); anything else is a code seam and gets 4 (depth).
+    bs_total=$(printf '%s\n' "$bs_entries" | grep -c .)
+    bs_stones=$(printf '%s\n' "$bs_entries" | grep -c '_waystone\.chloeai$' || true)
+    if [ "$bs_total" -eq "$bs_stones" ]; then bs_files=8; else bs_files=4; fi
+    bs_cap=$((16384 / bs_files))
+    bs_dir=$(dirname "$wf")
+    while IFS= read -r e; do
+      [ -z "$e" ] && continue
+      bs_path="$e"; [ -f "$bs_path" ] || bs_path="${bs_dir}/${e}"
+      [ -f "$bs_path" ] || continue
+      bs_size=$(wc -c < "$bs_path" | tr -d ' ')
+      if [ "$bs_size" -gt "$bs_cap" ]; then
+        pass "boot-source-size: ${e} is ${bs_size} chars vs a ${bs_cap} cap — $(( bs_cap * 100 / bs_size ))% of it can EVER be delivered (declared by ${wf})"
+        bs_flagged=$((bs_flagged+1))
+      fi
+    done < <(printf '%s\n' "$bs_entries")
+  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  if [ "$bs_cards" -eq 0 ]; then
+    pass "boot-source-size: no cards with a boot_path"
+  elif [ "$bs_flagged" -eq 0 ]; then
+    pass "boot-source-size: every declared boot source fits its per-entry cap (${bs_cards} card(s))"
+  else
+    pass "boot-source-size: ${bs_flagged} declared source(s) across ${bs_cards} card(s) can never arrive whole"
+  fi
+fi
+
+CURRENT_CATEGORY="validation-age"
+section "WISL validation age (report-only)"
+if [ ! -d .git ]; then
+  pass "validation-age: not a git repo — skipping"
+else
+  va_seen=0
+  while IFS= read -r wf; do
+    [ -z "$wf" ] && continue
+    va_sha=$(grep -oE '^validated_at:[[:space:]]*"?[0-9a-f]{7,40}"?' "$wf" 2>/dev/null \
+             | grep -oE '[0-9a-f]{7,40}' | head -1)
+    [ -z "$va_sha" ] && continue
+    va_seen=$((va_seen+1))
+    va_time=$(git log -1 --format=%ct "$va_sha" 2>/dev/null)
+    if [ -z "$va_time" ]; then
+      pass "validation-age: ${wf} — validated_at ${va_sha} does not resolve in git history"
+      continue
+    fi
+    pass "validation-age: ${wf} — $(( ( $(date +%s) - va_time ) / 86400 ))d since the validation: command last passed (${va_sha})"
+  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  [ "$va_seen" -eq 0 ] && pass "validation-age: no cards carry validated_at (field not yet adopted)"
+fi
+
+CURRENT_CATEGORY="continuity-age"
+section "WISL continuity age (report-only)"
+if [ ! -d .git ]; then
+  pass "continuity-age: not a git repo — skipping"
+else
+  ca_found=0
+  ca_stamped=0
+  while IFS= read -r wf; do
+    [ -z "$wf" ] && continue
+    grep -qE '^continuity:' "$wf" 2>/dev/null || continue
+    ca_found=$((ca_found+1))
+    ca_sha=$(grep -oE '^continuity_updated:[[:space:]]*"?[0-9a-f]{7,40}"?' "$wf" 2>/dev/null \
+             | grep -oE '[0-9a-f]{7,40}' | head -1)
+    if [ -z "$ca_sha" ]; then
+      pass "continuity-age: ${wf} — carries continuity: but no continuity_updated: (field not yet adopted)"
+      continue
+    fi
+    ca_time=$(git log -1 --format=%ct "$ca_sha" 2>/dev/null)
+    if [ -z "$ca_time" ]; then
+      # Same dangling-sha condition verified_at treats as a hard FAIL, but this
+      # category does not fail by design; say so plainly instead.
+      pass "continuity-age: ${wf} — continuity_updated ${ca_sha} does not resolve in git history"
+      continue
+    fi
+    ca_stamped=$((ca_stamped+1))
+    ca_days=$(( ( $(date +%s) - ca_time ) / 86400 ))
+    pass "continuity-age: ${wf} — ${ca_days}d since continuity_updated (${ca_sha})"
+  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  if [ "$ca_found" -eq 0 ]; then
+    pass "continuity-age: no cards carry a continuity: field"
+  else
+    pass "continuity-age: ${ca_stamped} of ${ca_found} card(s) with continuity: are stamped"
+  fi
 fi
 
 # ── 10. Up-sync hint freshness ────────────────────────────────
@@ -881,6 +1284,74 @@ else
       pass "seam-coverage: no declared seams for ${repo_name} in the seam map"
     elif [ "$sc_missing" -eq 0 ]; then
       pass "seam-coverage: all ${sc_checked} declared seam(s) for ${repo_name} have waystones"
+    fi
+  fi
+fi
+
+# ── 14. Hook canonicality ─────────────────────────────────────
+# Every .claude/hooks/*.sh must still BE the workspace canonical. Added 2026-08-09
+# after handoff-gate.sh was found forked in all eleven repos, in three distinct
+# stale versions, none of which had followed THR-020/ADR-012's rename of
+# recommended_model= to recommended_capability=. The charter's B3 capability
+# STOP-THE-LINE was dead fleet-wide for ~17 days and announced itself as a skip,
+# which reads like a pass. Nothing was watching the copies.
+#
+# The primary fix is structural: hooks are now symlinks to the canonical, the same
+# way .claude/skills/ has been since Phase H — which is exactly why the skills never
+# drifted. This check is the BACKSTOP for what a symlink cannot cover: a repo that
+# de-symlinks, and templateRepo_EXAMPLE, which must hold real files because it ships
+# {{AI}} placeholders that are substituted at seed time.
+#
+# Ladder, strictest first:
+#   symlink/hardlink to canonical (-ef)          → pass  (the intended state)
+#   byte-identical after {{AI}} substitution      → pass  (sanctioned template form)
+#   byte-identical copy                           → WARN  (in sync, but unlinked —
+#                                                   this is precisely how the drift
+#                                                   began: a correct copy that later
+#                                                   stopped being correct)
+#   anything else                                 → soft_fail (diverged)
+#
+# Graceful pass when no canonical dir is reachable (repo cloned outside the fleet,
+# single-repo CI checkout) — same dangle posture as the symlinked skill itself.
+# soft_fail: WARN by default, FAIL via --fail-on=hook-canonical.
+CURRENT_CATEGORY="hook-canonical"
+section "Hook canonicality"
+if [ ! -d .claude/hooks ]; then
+  pass "hook-canonical: no .claude/hooks — skipping"
+else
+  _top=$(git rev-parse --show-toplevel 2>/dev/null)
+  canon_hooks=""
+  for cand in \
+    "${_top:+${_top}/../.claude/hooks}" \
+    "${HOME}/GitHub/.claude/hooks"; do
+    [ -n "$cand" ] && [ -d "$cand" ] && { canon_hooks="$cand"; break; }
+  done
+  if [ -z "$canon_hooks" ]; then
+    pass "hook-canonical: workspace canonical hooks dir not reachable — skipping"
+  else
+    hc_checked=0; hc_bad=0
+    for hf in .claude/hooks/*.sh; do
+      [ -e "$hf" ] || continue
+      hb=$(basename "$hf"); cf="$canon_hooks/$hb"
+      hc_checked=$((hc_checked+1))
+      if [ ! -f "$cf" ]; then
+        soft_fail "hook-canonical: ${hb} has no counterpart in the workspace canonical — either it is repo-local (move it out of .claude/hooks) or the canonical lost it"
+        hc_bad=$((hc_bad+1))
+      elif [ "$hf" -ef "$cf" ]; then
+        :  # linked to canonical — the intended state
+      elif diff -q <(sed 's/chloeai/{{AI}}ai/g' "$cf") "$hf" >/dev/null 2>&1; then
+        :  # sanctioned template form: canonical + placeholder substitution
+      elif diff -q "$cf" "$hf" >/dev/null 2>&1; then
+        warn "hook-canonical: ${hb} is an unlinked COPY that currently matches the canonical — symlink it (ln -sf ../../../.claude/hooks/${hb}) before it drifts like handoff-gate.sh did"
+      else
+        soft_fail "hook-canonical: ${hb} has DIVERGED from the workspace canonical — diff it against ${cf} and relink"
+        hc_bad=$((hc_bad+1))
+      fi
+    done
+    if [ "$hc_checked" -eq 0 ]; then
+      pass "hook-canonical: no *.sh in .claude/hooks"
+    elif [ "$hc_bad" -eq 0 ]; then
+      pass "hook-canonical: all ${hc_checked} hook(s) match the workspace canonical"
     fi
   fi
 fi
