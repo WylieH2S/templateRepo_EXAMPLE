@@ -1,6 +1,29 @@
 #!/usr/bin/env bash
 # drift-sweep v0.1.15 — detect code/substrate drift in a repo.
 #
+# v0.1.18 (SESSION-089, 2026-08-09): NEW skill-canonical category + `--maintenance`
+# — the wy/chloe split.
+#
+# hook-canonical (v0.1.16) works because hooks have ONE right answer: be the
+# canonical. Skills do not. templateRepo_EXAMPLE holds two real skill copies that
+# look identical in kind and are opposites in intent: drift-sweep is a plain
+# tracking copy (re-sync it; a zero-diff against the canonical of its era proved
+# nothing would be lost), while validate-substrate is a DELIBERATE fork — fully
+# genericized, with a filename resolver so the template self-validates both before
+# and after init substitution. Copying canonical over that destroys real work.
+#
+# No inspection distinguishes them, so the repo DECLARES intent via
+# CANONICAL_FORK_SKILLS in .claude/drift-sweep.conf. Undeclared divergence
+# soft_fails, which forces exactly one question: re-sync, or declare a fork?
+#
+# `--maintenance` renders the outstanding upkeep BY DECISION-OWNER rather than by
+# file — CHLOE for restoring a known invariant (relink, or re-sync the template's
+# tracked copies, command printed), WY for a declared fork that has fallen behind
+# and needs a hand merge. That distinction is the expensive one: mistaking a fork
+# for a stale copy is how you silently delete engineering, and mistaking a stale
+# copy for a fork is how the fleet lost its capability gate for 17 days.
+# Read-only; always exits 0. Combine with --fleet.
+#
 # v0.1.17 (SESSION-089, 2026-08-09): probe-journal-in-diff exempts .claude/skills/
 # — canonical tool headers carry a curated changelog, not iteration noise, and the
 # check only ever fired on the template's sync path. See the exemption comment inline.
@@ -215,12 +238,14 @@ FAIL_ON_CATEGORIES=""
 
 SELF="${BASH_SOURCE[0]}"
 FLEET_MODE=0
+MAINTENANCE_MODE=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --json) JSON_OUTPUT=1; shift ;;
     --quiet) QUIET_OUTPUT=1; shift ;;
     --fleet) FLEET_MODE=1; shift ;;
+    --maintenance) MAINTENANCE_MODE=1; shift ;;
     --fail-on=*) FAIL_ON_CATEGORIES="${1#--fail-on=}"; shift ;;
     -*) echo "Unknown flag: $1" >&2; exit 1 ;;
     *) REPO="$1"; shift ;;
@@ -237,6 +262,7 @@ if [ "$FLEET_MODE" = "1" ]; then
   [ "$JSON_OUTPUT" = "1" ] && _pass="$_pass --json"
   [ "$QUIET_OUTPUT" = "1" ] && _pass="$_pass --quiet"
   [ -n "$FAIL_ON_CATEGORIES" ] && _pass="$_pass --fail-on=$FAIL_ON_CATEGORIES"
+  [ "$MAINTENANCE_MODE" = "1" ] && _pass="$_pass --maintenance"
   for _d in */; do
     _r="${_d%/}"
     [ -d "$_r/.git" ] || continue
@@ -290,6 +316,12 @@ JOURNAL_DIFF_LINES_FAIL="${JOURNAL_DIFF_LINES_FAIL:-3}"
 JOURNAL_HEADER_SCAN="${JOURNAL_HEADER_SCAN:-80}"
 JOURNAL_HEADER_FAIL="${JOURNAL_HEADER_FAIL:-5}"
 MISSION_STALE_DAYS="${MISSION_STALE_DAYS:-14}"
+# Skills under .claude/skills/ that are DELIBERATE forks of the workspace
+# canonical rather than copies expected to track it. A fork is never a drift
+# failure and is never auto-synced — it surfaces as a WY decision. Everything
+# not listed here is expected to track the canonical. See the skill-canonical
+# category and `--maintenance`.
+CANONICAL_FORK_SKILLS="${CANONICAL_FORK_SKILLS:-}"
 ORPHAN_EXPORT_ALLOWLIST="${ORPHAN_EXPORT_ALLOWLIST:-^$}"
 SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
 TIER1_FILES="${TIER1_FILES:-readme_AI.chloeai CLAUDE.md ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/CURRENT_MISSION.md ai_context/START_HERE.md}"
@@ -353,6 +385,145 @@ section() {
     echo "── $* ──"
   fi
 }
+
+# ── Canonical-tracking helpers (v0.1.18) ──────────────────────
+# Shared by hook-canonical, skill-canonical, and --maintenance so the three can
+# never disagree about what "matches the canonical" means.
+
+# canonical_dir <hooks|skills> — echo the workspace canonical dir; rc=1 if unreachable.
+canonical_dir() {
+  local kind="$1" top cand
+  top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  for cand in "${top:+${top}/../.claude/${kind}}" "${HOME}/GitHub/.claude/${kind}"; do
+    [ -n "$cand" ] && [ -d "$cand" ] && { printf '%s' "$cand"; return 0; }
+  done
+  return 1
+}
+
+# canonical_state <local_file> <canonical_file> — echo one of:
+#   LINKED   symlink/hardlink to canonical — the intended state in a real repo
+#   SUBST    byte-identical after {{AI}} substitution — the sanctioned template form
+#   COPY     byte-identical unlinked copy
+#   DIVERGED differs in a way substitution does not explain
+#   NOCANON  no canonical counterpart (repo-local file)
+canonical_state() {
+  local lf="$1" cf="$2"
+  [ -f "$cf" ] || { echo NOCANON; return; }
+  [ -e "$lf" ] || { echo DIVERGED; return; }
+  [ "$lf" -ef "$cf" ] && { echo LINKED; return; }
+  diff -q <(sed 's/chloeai/{{AI}}ai/g' "$cf") "$lf" >/dev/null 2>&1 && { echo SUBST; return; }
+  diff -q "$cf" "$lf" >/dev/null 2>&1 && { echo COPY; return; }
+  echo DIVERGED
+}
+
+# is_declared_fork <skill-name> — true when this repo declares the skill a
+# DELIBERATE fork of the canonical (CANONICAL_FORK_SKILLS in drift-sweep.conf).
+is_declared_fork() {
+  local n="$1" s
+  for s in ${CANONICAL_FORK_SKILLS:-}; do [ "$s" = "$n" ] && return 0; done
+  return 1
+}
+
+# ── Maintenance mode (v0.1.18) ────────────────────────────────
+# `--maintenance` answers one question the normal sweep deliberately does not:
+# of the substrate upkeep outstanding here, WHICH PART CAN CHLOE JUST DO, and
+# which part needs Wy?
+#
+# That split is not cosmetic. SESSION-089 spent a session on canonical drift and
+# the single most expensive judgement in it was telling a stale COPY (re-sync,
+# mechanical, no information lost) apart from a deliberate FORK (hand merge; a
+# copy destroys real work). Getting that wrong silently is how the fleet lost its
+# capability gate for 17 days. So the report sorts by decision-owner, not by file:
+#
+#   CHLOE — restoring a KNOWN invariant: relink a hook or skill where a symlink
+#           is intended, or re-sync the seed template's tracked copies. The exact
+#           command is printed. Nothing here needs a human to think.
+#   WY    — a DECLARED FORK has fallen behind canonical. There is no safe
+#           mechanical answer: a copy would destroy the fork's own work, so it
+#           needs a hand merge. This column is kept scarce on purpose — if
+#           everything lands in it, the split has stopped meaning anything.
+#
+# Read-only and always exits 0 — it reports, it never mutates. Combine with
+# --fleet to sweep every child repo.
+maintenance_report() {
+  local repo_label; repo_label=$(basename "$(pwd)")
+  local chloe_lines="" wy_lines=""
+
+  local ch; ch=$(canonical_dir hooks) || ch=""
+  if [ -n "$ch" ] && [ -d .claude/hooks ]; then
+    local hf hb st
+    for hf in .claude/hooks/*.sh; do
+      [ -e "$hf" ] || continue
+      hb=$(basename "$hf"); st=$(canonical_state "$hf" "$ch/$hb")
+      case "$st" in
+        DIVERGED) chloe_lines="${chloe_lines}    hook ${hb} DIVERGED -> ln -sf ../../../.claude/hooks/${hb} ${hf}"$'\n' ;;
+        COPY)     chloe_lines="${chloe_lines}    hook ${hb} unlinked copy (in sync) -> ln -sf ../../../.claude/hooks/${hb} ${hf}"$'\n' ;;
+        NOCANON)  wy_lines="${wy_lines}    hook ${hb} has NO canonical counterpart — repo-local hook, or the canonical lost it"$'\n' ;;
+      esac
+    done
+  fi
+
+  local cs; cs=$(canonical_dir skills) || cs=""
+  if [ -n "$cs" ] && [ -d .claude/skills ]; then
+    local sd sn cf cb behind drift
+    for sd in .claude/skills/*; do
+      [ -e "$sd" ] || continue
+      sn=$(basename "$sd"); [ -d "$cs/$sn" ] || continue
+      if is_declared_fork "$sn"; then
+        behind=0
+        for cf in "$cs/$sn"/*; do
+          [ -f "$cf" ] || continue
+          [ "$(canonical_state "$sd/$(basename "$cf")" "$cf")" = "DIVERGED" ] && behind=1
+        done
+        [ "$behind" = "1" ] && wy_lines="${wy_lines}    skill ${sn} is a DECLARED FORK behind canonical — hand merge, never a sync"$'\n'
+        continue
+      fi
+      [ -L "$sd" ] && [ "$sd" -ef "$cs/$sn" ] && continue
+      drift=""
+      for cf in "$cs/$sn"/*; do
+        [ -f "$cf" ] || continue
+        cb=$(basename "$cf")
+        case "$(canonical_state "$sd/$cb" "$cf")" in
+          LINKED|SUBST|COPY) : ;;
+          *) drift="${drift} ${cb}" ;;
+        esac
+      done
+      if [ -n "$drift" ]; then
+        # A TRACKED skill that drifted is mechanical, not a decision — the only
+        # question is which restore applies. The seed template is the one
+        # sanctioned copy-holder (it ships {{AI}} placeholders that init
+        # substitutes), so there the restore is a re-sync; everywhere else the
+        # invariant is a symlink and the restore is a relink.
+        if [ -f init-project.sh ]; then
+          chloe_lines="${chloe_lines}    skill ${sn} behind canonical (${drift# }) -> re-sync from ${cs}/${sn}, applying chloeai -> {{AI}}ai"$'\n'
+        else
+          chloe_lines="${chloe_lines}    skill ${sn} unlinked and DIVERGED (${drift# }) -> ln -sf ../../../.claude/skills/${sn} ${sd}"$'\n'
+        fi
+      fi
+    done
+  fi
+
+  echo
+  echo "══ MAINTENANCE — ${repo_label} ══"
+  if [ -z "$chloe_lines" ] && [ -z "$wy_lines" ]; then
+    echo "  ✓ nothing outstanding — hooks and skills reconciled with the workspace canonical"
+    return 0
+  fi
+  if [ -n "$chloe_lines" ]; then
+    echo "  CHLOE (mechanical — safe to apply, nothing to decide):"
+    printf '%s' "$chloe_lines"
+  fi
+  if [ -n "$wy_lines" ]; then
+    echo "  WY (needs a decision — do NOT auto-sync):"
+    printf '%s' "$wy_lines"
+  fi
+  return 0
+}
+
+if [ "$MAINTENANCE_MODE" -eq 1 ]; then
+  maintenance_report
+  exit 0
+fi
 
 if [ "$JSON_OUTPUT" -eq 0 ]; then
   echo "Drift-sweep in: $(pwd)"
@@ -1352,6 +1523,83 @@ else
       pass "hook-canonical: no *.sh in .claude/hooks"
     elif [ "$hc_bad" -eq 0 ]; then
       pass "hook-canonical: all ${hc_checked} hook(s) match the workspace canonical"
+    fi
+  fi
+fi
+
+# ── 15. Skill canonicality ────────────────────────────────────
+# Same question as hook-canonical, one directory over — but it CANNOT be the same
+# mechanical answer, and that is the whole point of this category.
+#
+# SESSION-089 found two skills in templateRepo_EXAMPLE that looked equally stale:
+# drift-sweep was a plain snapshot three versions behind (safe to re-sync, proven
+# by a zero-diff against the canonical of its era), while validate-substrate was
+# a DELIBERATE fork — fully genericized, carrying a purpose-built filename
+# resolver so the template self-validates before AND after init substitution.
+# Blanket-syncing "the template's skills" would have destroyed real engineering.
+#
+# No checker can tell those two apart by inspection, so the repo DECLARES intent:
+#   CANONICAL_FORK_SKILLS="validate-substrate"   (in .claude/drift-sweep.conf)
+# Everything else under .claude/skills/ is expected to track the canonical.
+#
+# The split is deliberately by DECISION-OWNER, which is what --maintenance renders:
+#   tracked + drifted  -> mechanical, safe to re-sync        (CHLOE can act)
+#   declared fork      -> merge by hand, never a copy        (WY decides)
+# A declared fork NEVER fails; it reports whether it has fallen behind so the
+# decision surfaces without nagging. An UNDECLARED divergence soft_fails, which
+# forces exactly one question: re-sync it, or declare it a fork?
+CURRENT_CATEGORY="skill-canonical"
+section "Skill canonicality"
+if [ ! -d .claude/skills ]; then
+  pass "skill-canonical: no .claude/skills — skipping"
+else
+  csk=$(canonical_dir skills) || csk=""
+  if [ -z "$csk" ]; then
+    pass "skill-canonical: workspace canonical skills dir not reachable — skipping"
+  else
+    sk_checked=0; sk_bad=0; sk_fork=0
+    for sd in .claude/skills/*; do
+      [ -e "$sd" ] || continue
+      sname=$(basename "$sd")
+      [ -d "$csk/$sname" ] || continue        # repo-local skill — nothing to track
+      sk_checked=$((sk_checked+1))
+
+      if is_declared_fork "$sname"; then
+        sk_fork=$((sk_fork+1))
+        fork_behind=0
+        for cf in "$csk/$sname"/*; do
+          [ -f "$cf" ] || continue
+          [ "$(canonical_state "$sd/$(basename "$cf")" "$cf")" = "DIVERGED" ] && fork_behind=1
+        done
+        if [ "$fork_behind" -eq 1 ]; then
+          pass "skill-canonical: ${sname} is a DECLARED FORK and differs from canonical — WY decision (hand merge, never a sync)"
+        else
+          pass "skill-canonical: ${sname} is a DECLARED FORK, currently level with canonical"
+        fi
+        continue
+      fi
+
+      if [ -L "$sd" ] && [ "$sd" -ef "$csk/$sname" ]; then
+        continue                              # symlinked — the intended state
+      fi
+      sk_drift=""
+      for cf in "$csk/$sname"/*; do
+        [ -f "$cf" ] || continue
+        cb=$(basename "$cf")
+        case "$(canonical_state "$sd/$cb" "$cf")" in
+          LINKED|SUBST|COPY) : ;;
+          *) sk_drift="${sk_drift} ${cb}" ;;
+        esac
+      done
+      if [ -n "$sk_drift" ]; then
+        soft_fail "skill-canonical: ${sname} tracks the canonical but has drifted:${sk_drift} — re-sync it, or declare it in CANONICAL_FORK_SKILLS if the divergence is deliberate"
+        sk_bad=$((sk_bad+1))
+      fi
+    done
+    if [ "$sk_checked" -eq 0 ]; then
+      pass "skill-canonical: no skills with a workspace canonical counterpart"
+    elif [ "$sk_bad" -eq 0 ]; then
+      pass "skill-canonical: ${sk_checked} skill(s) reconciled (${sk_fork} declared fork(s))"
     fi
   fi
 fi

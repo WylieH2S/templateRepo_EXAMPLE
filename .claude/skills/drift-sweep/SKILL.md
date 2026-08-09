@@ -17,19 +17,21 @@ The recurring pattern this skill exists to catch: a probe / iteration cycle adds
 ## Flags
 
 ```bash
-bash sweep.sh [--quiet] [--json] [--fail-on=<categories>] [<repo-path>]
+bash sweep.sh [--quiet] [--json] [--fleet] [--maintenance] [--fail-on=<categories>] [<repo-path>]
 ```
 
 | Flag | Effect |
 |------|--------|
 | `--quiet` | Suppress PASS lines; show only WARN and FAIL |
 | `--json` | Emit JSON to stdout (suppresses human-readable output) |
+| `--fleet` | Iterate every child repo of a workspace root, sweeping each in its OWN root |
+| `--maintenance` | Report outstanding canonical-tracking upkeep split by decision-owner (CHLOE / WY). Read-only, always exits 0 |
 | `--fail-on=<cats>` | Comma-separated list of categories that affect exit code; all categories still run and report |
 
-**Categories for `--fail-on`:** `working-tree`, `untracked-docs`, `cruft`, `file-journals`, `orphans`, `mission-freshness`, `claude-md`, `waystone-freshness`, `up-sync`, `wrap-continuity`, `wisl-graph`, `seam-coverage`
+**Categories for `--fail-on`:** `working-tree`, `untracked-docs`, `cruft`, `file-journals`, `orphans`, `mission-freshness`, `claude-md`, `waystone-validity`, `waystone-freshness`, `up-sync`, `wrap-continuity`, `wisl-graph`, `seam-coverage`, `hook-canonical`, `skill-canonical`
 
 > `tier1-bloat` is **advisory** (warn-only) — it always runs and reports, but never counts toward the exit code, so listing it in `--fail-on` has no effect.
-> `up-sync`, `wrap-continuity`, `wisl-graph`, and `seam-coverage` are **soft_fail** categories: WARN by default, hard-FAIL only when explicitly named in `--fail-on` (the "advisory-first, then arm" rollout).
+> `up-sync`, `wrap-continuity`, `wisl-graph`, `seam-coverage`, `hook-canonical`, and `skill-canonical` are **soft_fail** categories: WARN by default, hard-FAIL only when explicitly named in `--fail-on` (the "advisory-first, then arm" rollout).
 
 **Pre-commit use case** — run drift-sweep in lefthook without blocking on orphans (which need manual triage):
 ```bash
@@ -41,7 +43,7 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracke
 bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-journals | jq '.exit_failures'
 ```
 
-## Checks (v0.1.9)
+## Checks (v0.1.18)
 
 1. **Working-tree health** — total uncommitted insertions+deletions (FAIL if > `DIFF_FAIL_THRESHOLD`, default 1000); dirty file count (WARN if > `DIRTY_FILES_WARN`, default 10); count of `+// vX.Y.Z` comment lines added in a single file's diff (FAIL if > `JOURNAL_DIFF_LINES_FAIL`, default 3).
 2. **Untracked important docs** — any file under `git ls-files --others --exclude-standard` whose name contains `audit`/`findings`/`mission`/`handoff`/`decisions`/`charter`/`rules` and ends in `.md` or `.{{AI}}ai`. These should never be untracked.
@@ -57,6 +59,22 @@ bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-jour
 12. **WISL waystone graph connectivity** — every `depends_on` / `boot_path` edge in each waystone's frontmatter must resolve on disk (dangling edges strand the next agent on a card pointing at a moved path). Frontmatter-only parse. No waystones → graceful pass. **soft_fail** via `--fail-on=wisl-graph`.
 13. **WISL seam coverage** — folders the workspace seam map declares `needed`/`live` must carry a `_waystone.{{AI}}ai` (catches MISSING cards; waystone-freshness only catches stale ones). Graceful where the workspace seam map is unreachable (single-repo CI checkout). **soft_fail** via `--fail-on=seam-coverage`.
 14. **Hook canonicality** — every `.claude/hooks/*.sh` must still BE the workspace canonical: a symlink/hardlink to it (the intended state), or byte-identical after `{{AI}}` substitution (the sanctioned template form, since the template must ship real files). A byte-identical **unlinked copy** is a WARN, not a pass — that is exactly the state the fleet was in before `handoff-gate.sh` rotted into three stale versions across eleven repos, so "correct today" is not the property worth asserting. Anything else diverged → **soft_fail** via `--fail-on=hook-canonical`. Graceful pass where the workspace canonical is unreachable (repo cloned outside the fleet, single-repo CI checkout).
+
+15. **Skill canonicality** — the same question as `hook-canonical`, one directory over, but it cannot have the same mechanical answer. A skill copy may be a **tracking copy** (re-sync it) or a **deliberate fork** (a copy would destroy its own work), and nothing distinguishes those by inspection — so the repo declares intent with `CANONICAL_FORK_SKILLS` in `.claude/drift-sweep.conf`. A declared fork never fails; it reports whether it has fallen behind so the decision surfaces without nagging. Undeclared divergence **soft_fails** via `--fail-on=skill-canonical`, forcing exactly one question: re-sync, or declare it a fork? Skills with no canonical counterpart are repo-local and ignored.
+
+### Maintenance mode — the wy/chloe split
+
+```bash
+bash .claude/skills/drift-sweep/sweep.sh --maintenance          # this repo
+bash .claude/skills/drift-sweep/sweep.sh --fleet --maintenance ~/GitHub   # every repo
+```
+
+Reports outstanding substrate upkeep **by decision-owner** instead of by file:
+
+- **CHLOE** — restoring a known invariant: relink a hook or skill where a symlink is intended, or re-sync the seed template's tracking copies. The exact command is printed; nothing here needs a human to think.
+- **WY** — a declared fork has fallen behind canonical. No safe mechanical answer exists, so it needs a hand merge.
+
+The WY column is kept scarce on purpose. If everything lands in it, the split has stopped meaning anything. Read-only, always exits 0 — it reports, it never mutates.
 
 > **Known gap:** this numbered list documents the *gateable* categories. `sweep.sh` also runs several **report-only** categories added in v0.1.13–v0.1.15 (`branch-context`, `ownership-coverage`, `boot-source-size`, `validation-age`, `continuity-age`) that emit `pass` lines only and are documented in the `sweep.sh` header rather than here. This file's version history below also has a gap between v0.1.9 and v0.1.16 — `sweep.sh`'s own header is the authoritative changelog. Reconciling the two is tracked, not done.
 
@@ -115,7 +133,8 @@ Exit code: 0 if no failures, 1 if any FAIL, 2 if cannot enter target repo.
 
 ## Versions
 
-- **v0.1.17 (current)** — `probe-journal-in-diff` now exempts `.claude/skills/**`. Those are canonical tool sources whose headers carry a deliberate curated changelog (`sweep.sh`'s header is the authoritative version history), which is categorically different from the probe-iteration journaling the check exists to catch. In real repos those files are symlinks and never appear in a diff, so the check only ever fired on templateRepo_EXAMPLE's canonical-sync path — once per sync, never on a real defect. Verified narrow: identical version-bump content still FAILs under `src/` and is exempt only under `.claude/skills/`.
+- **v0.1.18 (current)** — Added the gateable `skill-canonical` category and `--maintenance`, the wy/chloe split. `hook-canonical` works because hooks have one right answer: *be the canonical*. Skills don't — templateRepo_EXAMPLE holds two real skill copies identical in kind and opposite in intent (drift-sweep is a tracking copy; validate-substrate is a deliberate fork whose own engineering a blind copy would delete). Intent is now declared via `CANONICAL_FORK_SKILLS`, and `--maintenance` renders outstanding upkeep by decision-owner rather than by file. Mistaking a fork for a stale copy silently deletes work; mistaking a stale copy for a fork is how the fleet lost its capability gate for 17 days.
+- **v0.1.17** — `probe-journal-in-diff` now exempts `.claude/skills/**`. Those are canonical tool sources whose headers carry a deliberate curated changelog (`sweep.sh`'s header is the authoritative version history), which is categorically different from the probe-iteration journaling the check exists to catch. In real repos those files are symlinks and never appear in a diff, so the check only ever fired on templateRepo_EXAMPLE's canonical-sync path — once per sync, never on a real defect. Verified narrow: identical version-bump content still FAILs under `src/` and is exempt only under `.claude/skills/`.
 - **v0.1.16** — Added the gateable `hook-canonical` category: nothing was watching the hooks. `handoff-gate.sh` was found forked in **all eleven repos**, in three distinct stale versions, none following THR-020/ADR-012's rename of `recommended_model=` → `recommended_capability=`; the capability STOP-THE-LINE was dead fleet-wide for ~17 days and reported itself as `skipping`, which reads as a pass. Root cause was an asymmetry inside one directory: `.claude/skills/` are **symlinks** to the workspace canonical and never drifted, while `.claude/hooks/` were **copies** and rotted. Hooks are now symlinked too; this category is the backstop for what a symlink cannot cover (a repo that de-symlinks, and the template, which must ship real files for its `{{AI}}` placeholders). The unlinked-but-identical tier is a deliberate WARN.
 - **v0.1.10–v0.1.15** — (docs gap; entries not backfilled here.) `sweep.sh`'s own header carries the authoritative changelog for these: added-file threshold exclusion, the `verified_at` → `reviewed_at`/`validated_at` split, branch visibility, boot-source deliverability, ownership coverage, and the report-only age categories.
 - **v0.1.9** — Added the gateable `wrap-continuity` category: the Agent Boot Contract W1 WRITE-edge floor (ADR-BOOT-001). Git-native session-wrap gate at the commit edge — carrier lag threshold (`WRAP_LAG_WARN`, default 10) with staged-carrier-passes-as-wrap; carrier auto-detection (`readme_AI.{{AI}}ai` / workspace HANDOFF log) with `WRAP_CARRIER` override; graceful where no carrier exists, so the symlinked fleet rollout is advisory-only until a repo arms it. Proven by a 10-case scenario harness. Closes the any-agent wrap gap (wrap discipline previously lived only in Claude-native SessionStart hooks).
