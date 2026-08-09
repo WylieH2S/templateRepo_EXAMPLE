@@ -2,10 +2,12 @@
 # handoff-gate.sh — SessionStart model/effort gate (generic; in-repo + workspace).
 #
 # Wired via .claude/settings.json SessionStart hook (matchers: startup, resume).
-# Reads the hook's stdin JSON, extracts the current `model`, compares it to the
-# active handoff's recommended_model, and prints a banner. SessionStart stdout is
+# Reads the hook's stdin JSON, maps the current provider-native `model` to a
+# provider-neutral capability, compares it to the active handoff's
+# recommended_capability, and prints a banner. SessionStart stdout is
 # injected into the session context, so the banner lands in front of the agent at
-# boot. A model MISMATCH is elevated to STOP-THE-LINE (HI Mode charter, B3).
+# boot. A capability MISMATCH is elevated to STOP-THE-LINE (HI Mode charter, B3).
+# Historical recommended_model handoffs remain dual-readable.
 #
 # Recommendation source (auto-detected by context):
 #   ./readme_AI.{{AI}}ai                          present → in-repo session
@@ -30,16 +32,16 @@ raw_model=$(printf '%s' "$input" \
   | grep -oE '"model"[[:space:]]*:[[:space:]]*"[^"]*"' \
   | head -1 | sed -E 's/.*:[[:space:]]*"([^"]*)".*/\1/')
 
-normalize() {  # claude-opus-4-8 → opus, *sonnet* → sonnet, *haiku* → haiku, *fable*/*mythos* → fable
+native_capability() {  # Claude adapter boundary; universal labels stay generic.
   case "$1" in
-    *opus*)   echo opus ;;
-    *sonnet*) echo sonnet ;;
-    *haiku*)  echo haiku ;;
-    *fable*|*mythos*) echo fable ;;
-    *)        echo "$1" ;;
+    *fable*|*mythos*) echo frontier_max ;;
+    *opus*)   echo frontier ;;
+    *sonnet*) echo balanced ;;
+    *haiku*)  echo economy ;;
+    *)        echo "" ;;
   esac
 }
-cur_model=$(normalize "$raw_model")
+cur_capability=$(native_capability "$raw_model")
 
 # recommendation source by context
 if [ -f ./readme_AI.{{AI}}ai ]; then
@@ -57,18 +59,39 @@ if git rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
   [ "${_behind:-0}" -gt 0 ] && echo "   ⚠ HANDOFF ($CTX): ${_behind} commit(s) behind origin — git pull to read the latest recommendation."
 fi
 
-rec_model=$(grep -oE 'recommended_model="?[a-z]+"?'  "$SRC" 2>/dev/null | tail -1 | sed 's/.*=//; s/"//g')
-rec_effort=$(grep -oE 'recommended_effort="?[a-z]+"?' "$SRC" 2>/dev/null | tail -1 | sed 's/.*=//; s/"//g')
+active_block=$(awk '
+  /^@[0-9][0-9][0-9][0-9]-/ { block=$0 ORS; next }
+  block != "" { block=block $0 ORS }
+  END { printf "%s", block }
+' "$SRC" 2>/dev/null)
+rec_capability=$(printf '%s' "$active_block" \
+  | grep -oE 'recommended_capability="?[a-z_]+"?' \
+  | tail -1 | sed 's/.*=//; s/"//g')
+legacy_model=$(printf '%s' "$active_block" \
+  | grep -oE 'recommended_model="?[a-z]+"?' \
+  | tail -1 | sed 's/.*=//; s/"//g')
+if [ -z "$rec_capability" ] && [ -n "$legacy_model" ]; then
+  rec_capability=$(native_capability "$legacy_model")
+fi
+rec_effort=$(printf '%s' "$active_block" \
+  | grep -oE 'recommended_effort="?[a-z]+"?' \
+  | tail -1 | sed 's/.*=//; s/"//g')
 eff_note="${rec_effort:-unspecified}"
 
-if [ -z "$rec_model" ]; then
-  echo "ℹ HANDOFF gate ($CTX): no recommended_model= in the latest handoff block — skipping."
-elif [ -z "$cur_model" ]; then
-  echo "ℹ HANDOFF ($CTX): recommends ${rec_model} / ${eff_note}. (Couldn't read current model from stdin — confirm /model + /effort manually.)"
-elif [ "$cur_model" != "$rec_model" ]; then
-  echo "⚠ HANDOFF ($CTX): recommends ${rec_model} / ${eff_note}.  You are on: ${cur_model}."
-  echo "   MODEL MISMATCH → STOP-THE-LINE: confirm /model (and /effort) before the first non-read action."
+if [ -z "$rec_capability" ]; then
+  echo "ℹ HANDOFF gate ($CTX): no recommended_capability= (or recognized legacy recommended_model=) in the latest handoff block — skipping."
+elif [ -z "$cur_capability" ]; then
+  echo "ℹ HANDOFF ($CTX): recommends capability=${rec_capability} / effort=${eff_note}. (Couldn't map current provider-native model ${raw_model:-unknown} — confirm provider/model + effort manually.)"
 else
-  echo "✓ HANDOFF ($CTX): on ${cur_model}, matching the recommendation. Recommended effort: ${eff_note} — confirm via /effort."
+  rec_model_capability="$rec_capability"
+  [ "$rec_model_capability" = "frontier_max" ] && rec_model_capability="frontier"
+  cur_model_capability="$cur_capability"
+  [ "$cur_model_capability" = "frontier_max" ] && cur_model_capability="frontier"
+  if [ "$cur_model_capability" != "$rec_model_capability" ]; then
+    echo "⚠ HANDOFF ($CTX): recommends capability=${rec_capability} / effort=${eff_note}. Current ${raw_model:-unknown} maps to capability=${cur_capability}."
+    echo "   CAPABILITY MISMATCH → STOP-THE-LINE: confirm provider/model (and effort) before the first non-read action."
+  else
+    echo "✓ HANDOFF ($CTX): current ${raw_model:-unknown} maps to capability=${cur_capability}, matching ${rec_capability}. Recommended effort: ${eff_note} — confirm separately."
+  fi
 fi
 exit 0
