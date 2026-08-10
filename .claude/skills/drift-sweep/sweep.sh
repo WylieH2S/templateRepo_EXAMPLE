@@ -1,5 +1,27 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.20 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.21 — detect code/substrate drift in a repo.
+#
+# v0.1.21 (SESSION-091, 2026-08-10): `--maintenance` now reports BACKSTOP HEALTH.
+#
+# The nightly fleet-sweep workflow failed 10 times out of 10 between 2026-08-06 and
+# 2026-08-10 — every run since it shipped — and nothing anywhere said so. The fleet
+# read 0 FAIL / 0 WARN the whole time while its server-side backstop had never once
+# executed a sweep. The credential was dead on arrival: a well-formed 40-char classic
+# PAT rejected 401 within 34 seconds of being stored, the third to do exactly that.
+#
+# SAME failure class as the capability gate's 17-day "skipping", the four dead
+# validation: fields and the zero-match owns glob — with one inversion that made it
+# worse. Those rendered a broken state as a WRONG state, which is at least visible to
+# anyone reading the output. This one rendered it as NO state: the only surface that
+# knew was GitHub's web UI, and nothing in the fleet reads that. An unwatched check is
+# indistinguishable from an absent one.
+#
+# Deliberately in --maintenance rather than as a gated category: this is the one probe
+# in the script that leaves the machine, and a network call has no business in a
+# pre-commit gate. Fenced hard — owning repo only, gh required AND authenticated,
+# timeout where the platform offers one, and every failure path prints "could not
+# check" rather than staying quiet. Reporting the inability to check IS the point; a
+# silent skip would rebuild the exact hole this closes.
 #
 # v0.1.20 (SESSION-090, 2026-08-09): NEW VERSIONED_BACKUP_ALLOWLIST conf knob.
 # The versioned-backup heuristic assumes a version in a filename means "stale copy".
@@ -250,6 +272,14 @@
 #   VERSIONED_BACKUP_ALLOWLIST — regex of PATHS exempt from the versioned-backup warn
 #                               (default "^$"). For files whose version IS the meaning —
 #                               a pinned snapshot of an external surface — not a stale copy.
+#   BACKSTOP_WORKFLOW         — CI workflow whose health --maintenance reports (default
+#                               "fleet-sweep.yml"). Only checked in the repo that
+#                               actually contains .github/workflows/<it>.
+#   BACKSTOP_STALE_DAYS       — age of the newest run past which the backstop is called
+#                               stale even if it succeeded (default 2; the schedule is
+#                               nightly, and GitHub silently disables cron on inactive
+#                               repos, which is itself a way for this to die quietly)
+#   BACKSTOP_CHECK            — set 0 to skip the one network probe entirely (default 1)
 #   SOURCE_EXTENSIONS         — file extensions to treat as source (default "ts tsx js py rs go swift")
 #   TIER1_FILES               — space-separated always-loaded substrate files to size-check
 #   TIER1_BLOAT_WARN_KB       — always-loaded file size WARN threshold in KB (default 25)
@@ -310,6 +340,33 @@ if [ "$FLEET_MODE" = "1" ]; then
     SWEEP_FLEET_CHILD=1 bash "$SELF" $_pass "$_r" || _fleet_rc=1
     echo
   done
+
+  # THE CONTROL PLANE IS NOT A CHILD OF THE WORKSPACE ROOT. It lives at
+  # ~/repoManager, deliberately outside the fleet root (and outside iCloud), and is
+  # reached only through symlinks — so the `for _d in */` loop above can never see it.
+  # That was nearly a repeat of the bug this release fixes: v0.1.21's backstop check
+  # only runs in the repo that OWNS the workflow, and that repo is the one the fleet
+  # pass structurally cannot reach. The mechanism would have existed, reported
+  # correctly when invoked by hand, and fired for nobody. Resolve it from the
+  # canonical skills dir and include it explicitly.
+  #
+  # MAINTENANCE ONLY, on purpose: pulling it into the gated sweep would change
+  # fleet-wide failure counts that CI and the boot banner key off, which is a
+  # different decision and not this one.
+  if [ "$MAINTENANCE_MODE" = "1" ] && [ -d .claude/skills ]; then
+    _sub=$(cd .claude/skills 2>/dev/null && pwd -P) || _sub=""
+    _sub="${_sub%/.claude/skills}"
+    _here=$(pwd -P)
+    case "$_sub" in
+      "$_here"|"$_here"/*) _sub="" ;;   # already covered by the loop above
+    esac
+    if [ -n "$_sub" ] && [ -d "$_sub/.git" ]; then
+      echo "════════ $(basename "$_sub") (control plane — outside the workspace root) ════════"
+      # shellcheck disable=SC2086
+      SWEEP_FLEET_CHILD=1 bash "$SELF" $_pass "$_sub" || _fleet_rc=1
+      echo
+    fi
+  fi
   exit "$_fleet_rc"
 fi
 
@@ -363,6 +420,9 @@ MISSION_STALE_DAYS="${MISSION_STALE_DAYS:-14}"
 CANONICAL_FORK_SKILLS="${CANONICAL_FORK_SKILLS:-}"
 ORPHAN_EXPORT_ALLOWLIST="${ORPHAN_EXPORT_ALLOWLIST:-^$}"
 VERSIONED_BACKUP_ALLOWLIST="${VERSIONED_BACKUP_ALLOWLIST:-^$}"
+BACKSTOP_WORKFLOW="${BACKSTOP_WORKFLOW:-fleet-sweep.yml}"
+BACKSTOP_STALE_DAYS="${BACKSTOP_STALE_DAYS:-2}"
+BACKSTOP_CHECK="${BACKSTOP_CHECK:-1}"
 SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
 TIER1_FILES="${TIER1_FILES:-readme_AI.chloeai CLAUDE.md ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/CURRENT_MISSION.md ai_context/START_HERE.md}"
 TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
@@ -485,9 +545,109 @@ is_declared_fork() {
 #
 # Read-only and always exits 0 — it reports, it never mutates. Combine with
 # --fleet to sweep every child repo.
+# Health of the server-side CI backstop. Returns lines on stdout, never fails.
+#
+# WHY IT REPORTS "COULD NOT CHECK" INSTEAD OF SKIPPING QUIETLY: this whole category
+# exists because absence of signal got read as health for four days. If gh is missing,
+# logged out, or the network is down, that is a DIFFERENT state from "green" and must
+# not print like it. The one thing this must never do is stay silent.
+backstop_report() {
+  local wf="${BACKSTOP_WORKFLOW}"
+  [ "${BACKSTOP_CHECK}" = "1" ] || return 0
+  [ -f ".github/workflows/${wf}" ] || return 0   # not the repo that owns the backstop
+
+  if ! command -v gh >/dev/null 2>&1; then
+    printf '    backstop %s: COULD NOT CHECK — gh not installed\n' "$wf"; return 0
+  fi
+  if ! gh auth status >/dev/null 2>&1; then
+    printf '    backstop %s: COULD NOT CHECK — gh not authenticated (gh auth login)\n' "$wf"; return 0
+  fi
+
+  # `timeout` is GNU and absent from a stock macOS; coreutils installs it as gtimeout.
+  # Where neither exists we fall through to gh's own HTTP timeout rather than block
+  # a maintenance report indefinitely on a bad network.
+  local to=""
+  if command -v timeout  >/dev/null 2>&1; then to="timeout 15"
+  elif command -v gtimeout >/dev/null 2>&1; then to="gtimeout 15"; fi
+
+  local slug runs
+  slug=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || slug=""
+  [ -n "$slug" ] || { printf '    backstop %s: COULD NOT CHECK — no GitHub remote resolved\n' "$wf"; return 0; }
+
+  # ONE call, and gh's OWN --jq does the aggregation — no external jq dependency and
+  # no second round-trip. Emitting a single tab-separated line keeps the shell side to
+  # a plain read: a captured JSON blob cannot be re-filtered by gh afterwards.
+  local errf; errf=$(mktemp 2>/dev/null || echo /tmp/ds_backstop.$$)
+  runs=$($to gh run list --repo "$slug" --workflow="$wf" --limit 20 \
+           --json conclusion,createdAt,databaseId \
+           --jq '"\(.[0].conclusion // "in_progress")\t\(.[0].createdAt)\t\(.[0].databaseId)\t\([.[]|select(.conclusion!="success")]|length)\t\([.[]|select(.conclusion=="success")]|length)\t\(length)"' \
+           2>"$errf") || runs=""
+  local errtxt; errtxt=$(head -c 300 "$errf" 2>/dev/null); rm -f "$errf"
+
+  if [ -z "$runs" ]; then
+    # A 404 is a DIFFERENT diagnosis from a network failure and points at a specific
+    # cause: gh resolves workflows by the DEFAULT BRANCH, so a workflow committed but
+    # not pushed, or living only on a feature branch, reads as absent. Saying "could
+    # not check" there would send someone hunting a network problem they do not have.
+    case "$errtxt" in
+      *404*|*"not found"*)
+        printf '    backstop %s: NOT FOUND on GitHub — gh resolves workflows on the DEFAULT BRANCH, so this is unpushed, on another branch, or renamed\n' "$wf" ;;
+      *)
+        printf '    backstop %s: COULD NOT CHECK — gh run list failed%s\n' "$wf" "${errtxt:+ (${errtxt%%$'\n'*})}" ;;
+    esac
+    return 0
+  fi
+
+  local last_c last_at last_id nfail nsucc ntot age_d
+  IFS=$'\t' read -r last_c last_at last_id nfail nsucc ntot <<EOF
+$runs
+EOF
+
+  # Known to GitHub but zero runs. For a SCHEDULED workflow this is its own failure
+  # mode — cron that never fired — and it is invisible precisely because there is no
+  # red run to notice.
+  if [ "${ntot:-0}" = "0" ]; then
+    printf '    backstop %s: has NEVER RUN — the workflow exists on GitHub but no run has ever started\n' "$wf"
+    return 0
+  fi
+
+  age_d=$(_days_since_iso "$last_at")
+
+  if [ "$last_c" = "success" ]; then
+    if [ -n "$age_d" ] && [ "$age_d" -gt "${BACKSTOP_STALE_DAYS}" ]; then
+      printf '    backstop %s: last run PASSED but %sd ago (> %sd) — the nightly schedule may have stopped firing\n' \
+        "$wf" "$age_d" "${BACKSTOP_STALE_DAYS}"
+    fi
+    return 0                                    # green and current — say nothing
+  fi
+
+  # Red. Distinguish "broke recently" from "never worked": different problems, and
+  # the second is the one that hides, because there is no green run to have lost.
+  if [ "$nsucc" = "0" ]; then
+    printf '    backstop %s: RED — last run %s %sd ago; %s of the last %s runs failed, with NO success on record.\n' \
+      "$wf" "$last_c" "${age_d:-?}" "$nfail" "$ntot"
+    printf '      A backstop that has never once succeeded is not protecting anything.  gh run view %s --log-failed\n' "$last_id"
+  else
+    printf '    backstop %s: RED — last run %s %sd ago (%s of last %s failed).  gh run view %s --log-failed\n' \
+      "$wf" "$last_c" "${age_d:-?}" "$nfail" "$ntot" "$last_id"
+  fi
+}
+
+# Whole days between an ISO-8601 UTC timestamp and now. BSD and GNU date take
+# incompatible parse flags, so try both and print nothing if neither works —
+# callers treat empty as "unknown age" rather than as zero.
+_days_since_iso() {
+  local iso="$1" then now
+  then=$(date -u -j -f "%Y-%m-%dT%H:%M:%SZ" "$iso" +%s 2>/dev/null) \
+    || then=$(date -u -d "$iso" +%s 2>/dev/null) || return 0
+  now=$(date -u +%s)
+  echo $(( (now - then) / 86400 ))
+}
+
 maintenance_report() {
   local repo_label; repo_label=$(basename "$(pwd)")
   local chloe_lines="" wy_lines=""
+  local backstop_lines; backstop_lines=$(backstop_report)
 
   local ch; ch=$(canonical_dir hooks) || ch=""
   if [ -n "$ch" ] && [ -d .claude/hooks ]; then
@@ -545,8 +705,19 @@ maintenance_report() {
 
   echo
   echo "══ MAINTENANCE — ${repo_label} ══"
+  # Printed FIRST and in its own band. A dead backstop is not one item among several
+  # — it is the reason every other line in every other repo's report should be trusted
+  # less, because nothing has been re-checking them server-side.
+  if [ -n "$backstop_lines" ]; then
+    echo "  BACKSTOP (server-side CI — this is what catches a bypassed local gate):"
+    printf '%s\n' "$backstop_lines"
+  fi
   if [ -z "$chloe_lines" ] && [ -z "$wy_lines" ]; then
-    echo "  ✓ nothing outstanding — hooks and skills reconciled with the workspace canonical"
+    if [ -z "$backstop_lines" ]; then
+      echo "  ✓ nothing outstanding — hooks and skills reconciled with the workspace canonical"
+    else
+      echo "  ✓ hooks and skills reconciled with the workspace canonical"
+    fi
     return 0
   fi
   if [ -n "$chloe_lines" ]; then
