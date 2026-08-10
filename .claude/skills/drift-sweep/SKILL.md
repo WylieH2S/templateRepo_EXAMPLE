@@ -43,7 +43,7 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracke
 bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-journals | jq '.exit_failures'
 ```
 
-## Checks (v0.1.18)
+## Checks (v0.1.19)
 
 1. **Working-tree health** — total uncommitted insertions+deletions (FAIL if > `DIFF_FAIL_THRESHOLD`, default 1000); dirty file count (WARN if > `DIRTY_FILES_WARN`, default 10); count of `+// vX.Y.Z` comment lines added in a single file's diff (FAIL if > `JOURNAL_DIFF_LINES_FAIL`, default 3).
 2. **Untracked important docs** — any file under `git ls-files --others --exclude-standard` whose name contains `audit`/`findings`/`mission`/`handoff`/`decisions`/`charter`/`rules` and ends in `.md` or `.{{AI}}ai`. These should never be untracked.
@@ -76,7 +76,29 @@ Reports outstanding substrate upkeep **by decision-owner** instead of by file:
 
 The WY column is kept scarce on purpose. If everything lands in it, the split has stopped meaning anything. Read-only, always exits 0 — it reports, it never mutates.
 
-> **Known gap:** this numbered list documents the *gateable* categories. `sweep.sh` also runs several **report-only** categories added in v0.1.13–v0.1.15 (`branch-context`, `ownership-coverage`, `boot-source-size`, `validation-age`, `continuity-age`) that emit `pass` lines only and are documented in the `sweep.sh` header rather than here. This file's version history below also has a gap between v0.1.9 and v0.1.16 — `sweep.sh`'s own header is the authoritative changelog. Reconciling the two is tracked, not done.
+### Report-only categories
+
+These always run, always report, and **never** affect the exit code — naming them in `--fail-on` has no effect. They exist to collect real data before a threshold gets set from a guess.
+
+| Category | Question it answers | Added |
+|----------|--------------------|-------|
+| `branch-context` | Are repo-governing files being staged on a non-default branch, where they stay inert until merge? | v0.1.13 |
+| `ownership-coverage` | What share of tracked source files is claimed by some card's `owns`? (The honest counterpart to `seam-coverage`, which only detects *deleted* cards.) | v0.1.14 |
+| `boot-source-size` | Which declared boot sources exceed the per-entry cap (`16384/max_files`) and so can never arrive whole? | v0.1.15 |
+| `validation-age` | How long since each card's `validation:` command last passed (`validated_at`)? | v0.1.13 |
+| `continuity-age` | How long since each card's `continuity:` prose was reconciled (`continuity_updated`)? | v0.1.13 |
+| `validation-liveness` | Could each card's `validation:` command **ever have failed**? | v0.1.19 |
+
+`validation-liveness` is the newest and the least obvious. `validation-age` reports how long since a command passed; it cannot notice that the command was incapable of doing anything else. Five fleet cards were:
+
+```bash
+npx tsc --noEmit 2>&1 | grep 'ai-control' | head -5; echo 'type-check done'   # `a; b` takes b's status; echo always succeeds
+make build 2>&1 | tail -5                                                      # a pipeline's status is its LAST stage
+```
+
+Both returned 0 unconditionally, for months, next to a real `verified_at` — so the cards looked maintained. The check is **static**: it reads shell grammar and never executes a validation command (doing so would need every toolchain present and would have side effects). It flags a trailing `echo`/`printf`/`true`/`:`, a trailing `|| true`, and a terminal pipe into `tail`/`head`/`cat`/`wc`/`tee`/`sort`/`tr`. **`grep` is deliberately excluded** — grep exits 1 on no-match, so a terminal `| grep -q x` is a real assertion, not a mask.
+
+> **Known gap:** the numbered list above covers the *gateable* categories; the report-only ones are tabled here as of v0.1.19. This file's version history below still has a gap between v0.1.9 and v0.1.16 — `sweep.sh`'s own header remains the authoritative changelog. Reconciling that remainder is tracked, not done.
 
 ## How to invoke
 
@@ -133,7 +155,8 @@ Exit code: 0 if no failures, 1 if any FAIL, 2 if cannot enter target repo.
 
 ## Versions
 
-- **v0.1.18 (current)** — Added the gateable `skill-canonical` category and `--maintenance`, the wy/chloe split. `hook-canonical` works because hooks have one right answer: *be the canonical*. Skills don't — templateRepo_EXAMPLE holds two real skill copies identical in kind and opposite in intent (drift-sweep is a tracking copy; validate-substrate is a deliberate fork whose own engineering a blind copy would delete). Intent is now declared via `CANONICAL_FORK_SKILLS`, and `--maintenance` renders outstanding upkeep by decision-owner rather than by file. Mistaking a fork for a stale copy silently deletes work; mistaking a stale copy for a fork is how the fleet lost its capability gate for 17 days.
+- **v0.1.19 (current)** — Added the report-only `validation-liveness` category, and documented the report-only set in a table for the first time. `validation-age` could say how long since a card's `validation:` passed but never whether it *could have failed*; five fleet cards could not. Planitaria's `src/model` ran a tsc pipeline ending in `echo`, so it exited 0 unconditionally for months while sitting next to a real `verified_at`. Four PocketLink cards ran `make build 2>&1 | tail -5` — `tail` masks the status, and there is no `build` target anyway, only a `build/` **directory** that make reports "up to date", so the command compiled nothing and reported success. Same species as the capability gate that printed "skipping" for 17 days: a check whose failure path renders as success. Static analysis only, no execution. Verified on a 13-case harness (6 dead / 7 live) and across all 57 fleet cards — 4 flagged, 0 false positives. The banner on line 2 of `sweep.sh` was also corrected; it had read `v0.1.15` through four releases, which is the same defect in miniature.
+- **v0.1.18** — Added the gateable `skill-canonical` category and `--maintenance`, the wy/chloe split. `hook-canonical` works because hooks have one right answer: *be the canonical*. Skills don't — templateRepo_EXAMPLE holds two real skill copies identical in kind and opposite in intent (drift-sweep is a tracking copy; validate-substrate is a deliberate fork whose own engineering a blind copy would delete). Intent is now declared via `CANONICAL_FORK_SKILLS`, and `--maintenance` renders outstanding upkeep by decision-owner rather than by file. Mistaking a fork for a stale copy silently deletes work; mistaking a stale copy for a fork is how the fleet lost its capability gate for 17 days.
 - **v0.1.17** — `probe-journal-in-diff` now exempts `.claude/skills/**`. Those are canonical tool sources whose headers carry a deliberate curated changelog (`sweep.sh`'s header is the authoritative version history), which is categorically different from the probe-iteration journaling the check exists to catch. In real repos those files are symlinks and never appear in a diff, so the check only ever fired on templateRepo_EXAMPLE's canonical-sync path — once per sync, never on a real defect. Verified narrow: identical version-bump content still FAILs under `src/` and is exempt only under `.claude/skills/`.
 - **v0.1.16** — Added the gateable `hook-canonical` category: nothing was watching the hooks. `handoff-gate.sh` was found forked in **all eleven repos**, in three distinct stale versions, none following THR-020/ADR-012's rename of `recommended_model=` → `recommended_capability=`; the capability STOP-THE-LINE was dead fleet-wide for ~17 days and reported itself as `skipping`, which reads as a pass. Root cause was an asymmetry inside one directory: `.claude/skills/` are **symlinks** to the workspace canonical and never drifted, while `.claude/hooks/` were **copies** and rotted. Hooks are now symlinked too; this category is the backstop for what a symlink cannot cover (a repo that de-symlinks, and the template, which must ship real files for its `{{AI}}` placeholders). The unlinked-but-identical tier is a deliberate WARN.
 - **v0.1.10–v0.1.15** — (docs gap; entries not backfilled here.) `sweep.sh`'s own header carries the authoritative changelog for these: added-file threshold exclusion, the `verified_at` → `reviewed_at`/`validated_at` split, branch visibility, boot-source deliverability, ownership coverage, and the report-only age categories.

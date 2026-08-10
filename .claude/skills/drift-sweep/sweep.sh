@@ -1,5 +1,29 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.15 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.19 — detect code/substrate drift in a repo.
+#
+# (This banner read v0.1.15 through four releases while the changelog below moved on —
+# corrected at v0.1.19. A version string that nothing checks is its own small instance
+# of the failure this release exists to catch.)
+#
+# v0.1.19 (SESSION-090, 2026-08-09): NEW validation-liveness category (REPORT-ONLY).
+# validation-age says how long since a card's validation: passed; it cannot say whether
+# that command was ever CAPABLE of failing. Five fleet cards were not.
+#
+# Planitaria src/model carried `npx tsc --noEmit 2>&1 | grep … | head -5; echo done` —
+# the status of `a; b` is b's, and echo always succeeds, so it returned 0 no matter what
+# tsc found, for months, next to a real verified_at that made the card look maintained.
+# Four PocketLink cards used `make build 2>&1 | tail -5`: a pipeline's status is its LAST
+# stage, so tail masked make entirely — and there is no `build` target anyway, just a
+# build/ DIRECTORY that make reports "up to date". Doubly dead.
+#
+# Same species as the capability gate that printed "skipping" for 17 days: a check whose
+# failure path renders as success. STATIC ONLY — this reads shell grammar, it never
+# executes a validation command (that would need every toolchain present and would have
+# side effects). `grep` is deliberately absent from the filter list: grep exits 1 on
+# no-match, so a terminal `| grep -q x` is a real assertion, not a mask.
+# Report-only on purpose, matching how ownership-coverage and boot-source-size landed:
+# collect real data first, set the gate from it later. Verified on a 13-case harness
+# (6 dead / 7 live) and across all 57 fleet cards — 4 flagged, 0 false positives.
 #
 # v0.1.18 (SESSION-089, 2026-08-09): NEW skill-canonical category + `--maintenance`
 # — the wy/chloe split.
@@ -1238,6 +1262,70 @@ else
     pass "validation-age: ${wf} — $(( ( $(date +%s) - va_time ) / 86400 ))d since the validation: command last passed (${va_sha})"
   done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   [ "$va_seen" -eq 0 ] && pass "validation-age: no cards carry validated_at (field not yet adopted)"
+fi
+
+# ── 9f. Validation liveness (v0.1.19, REPORT-ONLY) ────────────
+# validation-age answers "how long since this card's validation: passed." It cannot
+# answer the prior question: COULD that command ever have failed?
+#
+# Planitaria's src/model card carried
+#     npx tsc --noEmit 2>&1 | grep 'ai-control' | head -5; echo 'type-check done'
+# for months. The exit status of `a; b` is b's, and `echo` always succeeds — so the
+# command returned 0 unconditionally, no matter what tsc found. It sat next to a real
+# verified_at, so the card LOOKED maintained. Four PocketLink cards had the same defect
+# via a different route: `make build 2>&1 | tail -5` (status of a pipeline is its LAST
+# stage, and `tail` does not care that make failed) — compounded by there being no
+# `build` target at all, only a build/ DIRECTORY, which make reports as "up to date".
+#
+# This is the same species as the capability gate that printed "skipping" for 17 days:
+# a check whose failure path renders as success. The question worth asking is not
+# "did it pass" but "could it ever have failed".
+#
+# STATIC ONLY — nothing here executes a validation command. Executing them would need
+# every toolchain present (GBDK, venvs, npm) and would have side effects; this reads the
+# shell grammar and reports commands whose final exit status is structurally pinned to 0.
+# `grep` is deliberately NOT in the filter list: grep exits 1 on no-match, so a terminal
+# `| grep -q x` is a meaningful assertion, not a mask.
+CURRENT_CATEGORY="validation-liveness"
+section "WISL validation liveness (report-only)"
+vl_seen=0
+vl_dead=0
+while IFS= read -r wf; do
+  [ -z "$wf" ] && continue
+  vl_cmd=$(grep -m1 '^validation:' "$wf" 2>/dev/null | sed 's/^validation:[[:space:]]*//')
+  [ -z "$vl_cmd" ] && continue
+  vl_seen=$((vl_seen+1))
+  vl_verdict=$(printf '%s\n' "$vl_cmd" | awk '
+    {
+      s = $0
+      sub(/^"/, "", s); sub(/"[[:space:]]*$/, "", s)
+      sub(/^\047/, "", s); sub(/\047[[:space:]]*$/, "", s)
+      sub(/[[:space:]]+#.*$/, "", s)
+      if (s ~ /\|\|[[:space:]]*(true|:)[[:space:]]*$/) {
+        print "ends in `|| true` — cannot return non-zero"; exit
+      }
+      gsub(/\|\|/, "\002", s)              # protect || from the pipeline split
+      n = split(s, a, ";"); seg = a[n]     # `a; b` takes b'\''s status
+      m = split(seg, b, "|"); last = b[m]  # `a | b` takes b'\''s status
+      gsub(/\002/, "||", last)
+      gsub(/^[[:space:]]+/, "", last); gsub(/[[:space:]]+$/, "", last)
+      split(last, w, " "); c = w[1]; sub(/.*\//, "", c)
+      if (c == "echo" || c == "printf" || c == "true" || c == ":")
+        print "final command is `" c "` — always exits 0, so this can never fail"
+      else if (c == "tail" || c == "head" || c == "cat" || c == "wc" || c == "tee" || c == "sort" || c == "tr")
+        print "output piped into `" c "`, which discards the real exit status"
+    }')
+  if [ -n "$vl_verdict" ]; then
+    pass "validation-liveness: ${wf} — ${vl_verdict}"
+    vl_dead=$((vl_dead+1))
+  fi
+done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+if [ "$vl_seen" -eq 0 ]; then
+  pass "validation-liveness: no cards carry a validation: field"
+elif [ "$vl_dead" -eq 0 ]; then
+  pass "validation-liveness: all ${vl_seen} validation: command(s) can return non-zero"
+else
+  pass "validation-liveness: ${vl_dead} of ${vl_seen} validation: command(s) cannot fail — they report success unconditionally"
 fi
 
 CURRENT_CATEGORY="continuity-age"
