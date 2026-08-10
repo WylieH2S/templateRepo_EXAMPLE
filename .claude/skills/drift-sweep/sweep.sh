@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.19 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.20 — detect code/substrate drift in a repo.
+#
+# v0.1.20 (SESSION-090, 2026-08-09): NEW VERSIONED_BACKUP_ALLOWLIST conf knob.
+# The versioned-backup heuristic assumes a version in a filename means "stale copy".
+# Sometimes the version IS the meaning. TFNerd pins SDK_INVENTORY_v1230_2026_05_19.md
+# as the only surviving record of the PortalSDK v1.2.3.0 export surface — PortalSDK/ is
+# gitignored and overwritten in place, five files cite the snapshot, and renaming it to
+# satisfy the heuristic would destroy the version it exists to record. Same shape as the
+# existing ORPHAN_EXPORT_ALLOWLIST: the repo DECLARES its exception instead of the check
+# guessing, and the default ("^$") exempts nothing, so no repo's behavior changes until
+# it opts in. Verified narrow: the declared regex exempts only dated SDK_INVENTORY
+# snapshots under ai_context/audits/ and still warns on src/foo_v2.ts,
+# ai_context/audits/NOTES_v2.md, and the same filename in another directory.
 #
 # (This banner read v0.1.15 through four releases while the changelog below moved on —
 # corrected at v0.1.19. A version string that nothing checks is its own small instance
@@ -235,6 +247,9 @@
 #   JOURNAL_HEADER_FAIL       — version-bump lines in file header FAIL threshold (default 5)
 #   MISSION_STALE_DAYS        — code-newer-than-mission FAIL threshold in days (default 14)
 #   ORPHAN_EXPORT_ALLOWLIST   — regex of export names to skip (default "^$")
+#   VERSIONED_BACKUP_ALLOWLIST — regex of PATHS exempt from the versioned-backup warn
+#                               (default "^$"). For files whose version IS the meaning —
+#                               a pinned snapshot of an external surface — not a stale copy.
 #   SOURCE_EXTENSIONS         — file extensions to treat as source (default "ts tsx js py rs go swift")
 #   TIER1_FILES               — space-separated always-loaded substrate files to size-check
 #   TIER1_BLOAT_WARN_KB       — always-loaded file size WARN threshold in KB (default 25)
@@ -347,6 +362,7 @@ MISSION_STALE_DAYS="${MISSION_STALE_DAYS:-14}"
 # category and `--maintenance`.
 CANONICAL_FORK_SKILLS="${CANONICAL_FORK_SKILLS:-}"
 ORPHAN_EXPORT_ALLOWLIST="${ORPHAN_EXPORT_ALLOWLIST:-^$}"
+VERSIONED_BACKUP_ALLOWLIST="${VERSIONED_BACKUP_ALLOWLIST:-^$}"
 SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
 TIER1_FILES="${TIER1_FILES:-readme_AI.chloeai CLAUDE.md ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/CURRENT_MISSION.md ai_context/START_HERE.md}"
 TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
@@ -706,7 +722,15 @@ if [ -d .git ]; then
     || true)
   if [ -n "$vbak" ]; then
     while IFS= read -r f; do
-      [ -n "$f" ] && warn "versioned-backup file: ${f}"
+      [ -z "$f" ] && continue
+      # VERSIONED_BACKUP_ALLOWLIST (v0.1.20) — the version in the FILENAME is sometimes the
+      # meaning, not a stale copy. TFNerd pins SDK_INVENTORY_v1230_2026_05_19.md as the only
+      # record of the PortalSDK v1.2.3.0 export surface, because PortalSDK/ itself is
+      # gitignored and gets overwritten in place; five files cite it, and renaming it would
+      # destroy the version it exists to record. Same shape as ORPHAN_EXPORT_ALLOWLIST:
+      # a repo declares its exception rather than the check guessing.
+      if echo "$f" | grep -qE "$VERSIONED_BACKUP_ALLOWLIST"; then continue; fi
+      warn "versioned-backup file: ${f}"
       cruft_found=1
     done <<< "$vbak"
   fi
