@@ -1,5 +1,23 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.22 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.23 — detect code/substrate drift in a repo.
+#
+# v0.1.23 (SESSION-092, 2026-08-15): portable `_mtime`. THE BACKSTOP'S FIRST GREEN
+# CREDENTIAL IMMEDIATELY PAID FOR ITSELF.
+#
+# Minutes after the fleet token was finally accepted, the first real run failed six
+# times across the fleet with `line 1022: File: unbound variable`. Cause: `stat -f %m`
+# is BSD syntax; to GNU stat `-f` is FILESYSTEM mode, so `%m` is read as a filename.
+# GNU stats the real file anyway, prints its filesystem block (`  File: "..."`) to
+# stdout, and exits non-zero for the bad operand — so the `||` fallback ALSO runs and
+# command substitution concatenates both. See the note on `_mtime` for the full chain.
+#
+# THE POINT IS NOT THE FLAG. The substrate-vs-code freshness category has been
+# incapable of running on Linux since it was written, and no surface in this fleet
+# could say so, because the only thing that runs it on Linux is the nightly CI that
+# had never once authenticated. A category that cannot execute reports nothing, and
+# nothing reads identically to clean. That is the same shape as the 17-day "skipping"
+# capability gate, the zero-match owns glob, and the backstop's own silent death —
+# and it was caught within the hour by the machine finally being allowed to look.
 #
 # v0.1.22 (SESSION-092, 2026-08-15): `--backstop-only` — the v0.1.21 probe, reachable
 # from a boot.
@@ -654,6 +672,40 @@ EOF
   fi
 }
 
+# Modification time of a file as a unix epoch integer, on BSD and GNU alike.
+#
+# WHY THIS IS A FUNCTION AND NOT THE ONE-LINER IT REPLACED. The old idiom was
+#   mt=$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null || echo 0)
+# which is correct ONLY on BSD. `-f` means "format" to BSD stat but "filesystem
+# mode" to GNU stat, so on Linux `%m` is read as a FILENAME operand: GNU stats the
+# real file anyway, prints its filesystem block — which begins `  File: "..."` — to
+# STDOUT, and exits non-zero because the `%m` operand does not exist. The `||` then
+# fires too, and command substitution concatenates BOTH outputs. The caller gets
+# `File: "..."` glued to a number, and `$((newest_code - sub_mt))` dies on the
+# bareword: `line 1022: File: unbound variable`.
+#
+# FOUND BY THE BACKSTOP'S FIRST-EVER SUCCESSFUL RUN (2026-08-15). It fired six times
+# across the fleet. The whole substrate-vs-code freshness category has been incapable
+# of running on Linux since it was written, and nothing could report that, because
+# the only thing that executes this on Linux is the nightly CI that had never once
+# authenticated. Exactly the class this backstop exists to catch, caught the hour it
+# started working.
+#
+# The load-bearing fix is the NUMERIC VALIDATION, not the flag order: a fallback
+# chain that accepts whatever lands on stdout is unsafe no matter which form runs
+# first, because a failing stat can print AND fail. Each candidate must look like an
+# integer before it is believed.
+_mtime() {
+  local m
+  m=$(stat -c %Y "$1" 2>/dev/null) || m=""
+  case "$m" in ''|*[!0-9]*) m="" ;; esac
+  if [ -z "$m" ]; then
+    m=$(stat -f %m "$1" 2>/dev/null) || m=""
+    case "$m" in ''|*[!0-9]*) m="" ;; esac
+  fi
+  printf '%s' "${m:-0}"
+}
+
 # Whole days between an ISO-8601 UTC timestamp and now. BSD and GNU date take
 # incompatible parse flags, so try both and print nothing if neither works —
 # callers treat empty as "unknown age" rather than as zero.
@@ -1011,14 +1063,14 @@ if [ -d .git ]; then
   newest_code=0
   while IFS= read -r f; do
     [ -z "$f" ] || [ ! -f "$f" ] && continue
-    mt=$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null || echo 0)
+    mt=$(_mtime "$f")
     [ "$mt" -gt "$newest_code" ] && newest_code=$mt
   done < <(list_source_files)
 
   stale_seconds=$((MISSION_STALE_DAYS * 86400))
   for sub in ai_context/CURRENT_MISSION.md readme_AI.chloeai; do
     if [ -f "$sub" ]; then
-      sub_mt=$(stat -f %m "$sub" 2>/dev/null || stat -c %Y "$sub" 2>/dev/null || echo 0)
+      sub_mt=$(_mtime "$sub")
       delta=$((newest_code - sub_mt))
       if [ "$delta" -gt "$stale_seconds" ]; then
         days=$((delta / 86400))
