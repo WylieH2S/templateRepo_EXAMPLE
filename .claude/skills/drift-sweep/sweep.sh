@@ -1,5 +1,28 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.23 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.24 — detect code/substrate drift in a repo.
+#
+# v0.1.24 (SESSION-092-FOLLOWON, 2026-08-15): `template_form()` — ONE implementation
+# of the canonical→template rule, and the rule now covers BOTH name tokens.
+#
+# templateRepo_EXAMPLE's sweep.sh was a PLAIN COPY carrying 45 literal `.{{AI}}ai`,
+# so a repo seeded under a different AI name got a drift-sweep hunting for another
+# AI's files: it would find nothing and report CLEAN. Silent-pass class, shipped to
+# third parties. The old convention ("plain copy, because its {{AI}} strings are
+# literal substitution logic") conflated *contains the placeholder as data* with
+# *must not be genericized* — two different claims. Protecting 2 data sites by
+# refusing 45 substitutions is what shipped the defect.
+#
+# Two things were wrong and both are fixed here:
+#   1. The SUBST rule only substituted the AI token, never the HUMAN one, so a
+#      template copy could satisfy the gate while hardcoding `hey{{HUMAN}}`. A gate that
+#      checks one of two tokens passes files it should fail.
+#   2. The gate and the re-sync were SEPARATE implementations. Caught mid-fix: a
+#      plain `sed` over every line was the gate, while the re-sync skipped
+#      substitution-rule lines, so a correctly-synced file read as DIVERGED. They
+#      are now one function — the generator and the verifier cannot disagree.
+#
+# v0.1.23 (SESSION-092, 2026-08-15): portable `_mtime`. THE BACKSTOP'S FIRST GREEN
+# CREDENTIAL IMMEDIATELY PAID FOR ITSELF.
 #
 # v0.1.23 (SESSION-092, 2026-08-15): portable `_mtime`. THE BACKSTOP'S FIRST GREEN
 # CREDENTIAL IMMEDIATELY PAID FOR ITSELF.
@@ -189,7 +212,7 @@
 # treatment lockfiles already had. Verified both directions: a new 1,149-line file
 # passes; churning that same file by 1,149 lines still FAILS at 2,298.
 #
-# OWNERSHIP COVERAGE. Ratifies seam-coverage-definition.chloeai §4. `seam-coverage`
+# OWNERSHIP COVERAGE. Ratifies seam-coverage-definition.{{AI}}ai §4. `seam-coverage`
 # compares two hand-maintained lists and reports their agreement — it cannot see a
 # folder nobody declared. This measures what share of tracked source falls under SOME
 # card's `owns`, derived from the cards plus git with no hand-maintained input. Fleet
@@ -220,10 +243,10 @@
 # nothing at all under --quiet (so no lefthook gets noisier). Deliberately inert while
 # ages accumulate across the fleet — a guessed threshold produces a gate that fires
 # wrong, and one that fires wrong gets ignored. Arm it from data, not from a number
-# that felt right. Same rollout discipline as seam-coverage-definition.chloeai §5.
+# that felt right. Same rollout discipline as seam-coverage-definition.{{AI}}ai §5.
 #
-# v0.1.12 (SESSION-085, 2026-08-06): waystone-validity also checks the heywy DOORWAY.
-# A root card with a `heywy:` inscription is written for a human; ./_waystone.heywy
+# v0.1.12 (SESSION-085, 2026-08-06): waystone-validity also checks the hey{{HUMAN}} DOORWAY.
+# A root card with a `hey{{HUMAN}}:` inscription is written for a human; ./_waystone.hey{{HUMAN}}
 # is how it gets read. The workspace root carried an inscription and no doorway for
 # weeks and nothing noticed. Folded into waystone-validity rather than given its own
 # category so it inherits an already-armed gate — validate-substrate runs in NO
@@ -233,7 +256,7 @@
 # card actually PARSE? Every other WISL gate is a grep/awk extractor and presumes
 # the card loads. OperationFarmstock's root waystone was unparseable for four days
 # and thirteen commits (literal inch marks inside a double-quoted YAML scalar);
-# the registry silently dropped it, that repo had no WISL route and no heywy
+# the registry silently dropped it, that repo had no WISL route and no hey{{HUMAN}}
 # doorway, five of those commits existed only to re-stamp verified_at on it, and
 # every gate stayed green the whole time. Replicates parse_waystone() exactly.
 # Optional layered parser (python3+PyYAML, then ruby/psych — verified to agree on
@@ -251,7 +274,7 @@
 #
 # v0.1.9: NEW wrap-continuity category — the Agent Boot Contract W1 WRITE edge
 # (ADR-BOOT-001). The session-wrap gate moves to git-native ground: the carrier
-# (readme_AI.chloeai in-repo / the workspace HANDOFF log in the substrate repo)
+# (readme_AI.{{AI}}ai in-repo / the workspace HANDOFF log in the substrate repo)
 # must not lag HEAD by more than WRAP_LAG_WARN commits (default 10), and a commit
 # that stages the carrier passes as the wrap itself. soft_fail: WARN by default,
 # gate via --fail-on=wrap-continuity. Graceful where no carrier exists, so the
@@ -321,7 +344,7 @@
 #   TIER1_FILES               — space-separated always-loaded substrate files to size-check
 #   TIER1_BLOAT_WARN_KB       — always-loaded file size WARN threshold in KB (default 25)
 #   WRAP_CARRIER              — wrap-continuity carrier override (default: auto-detect
-#                               readme_AI.chloeai, else the workspace HANDOFF log)
+#                               readme_AI.{{AI}}ai, else the workspace HANDOFF log)
 #   WRAP_LAG_WARN             — commits the carrier may lag HEAD before wrap-continuity
 #                               flags (default 10)
 #
@@ -463,7 +486,7 @@ BACKSTOP_WORKFLOW="${BACKSTOP_WORKFLOW:-fleet-sweep.yml}"
 BACKSTOP_STALE_DAYS="${BACKSTOP_STALE_DAYS:-2}"
 BACKSTOP_CHECK="${BACKSTOP_CHECK:-1}"
 SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
-TIER1_FILES="${TIER1_FILES:-readme_AI.chloeai CLAUDE.md ai_context/ai_rules.chloeai ai_context/glossary.chloeai ai_context/CURRENT_MISSION.md ai_context/START_HERE.md}"
+TIER1_FILES="${TIER1_FILES:-readme_AI.{{AI}}ai CLAUDE.md ai_context/ai_rules.{{AI}}ai ai_context/glossary.{{AI}}ai ai_context/CURRENT_MISSION.md ai_context/START_HERE.md}"
 TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
 WRAP_CARRIER="${WRAP_CARRIER:-}"
 WRAP_LAG_WARN="${WRAP_LAG_WARN:-10}"
@@ -541,16 +564,44 @@ canonical_dir() {
 
 # canonical_state <local_file> <canonical_file> — echo one of:
 #   LINKED   symlink/hardlink to canonical — the intended state in a real repo
-#   SUBST    byte-identical after {{AI}} substitution — the sanctioned template form
+#   SUBST    byte-identical after BOTH name substitutions — the sanctioned template form:
+#            chloeai -> {{AI}}ai AND heywy -> hey{{HUMAN}}. The second half was added
+#            2026-08-15 (SESSION-092-FOLLOWON). The rule had only ever covered the AI
+#            token, so a template copy could satisfy it while still hardcoding the HUMAN
+#            one — and templateRepo's sweep.sh did exactly that, carrying 18 literal
+#            human-token refs. A gate that checks one of two tokens passes files it
+#            should fail.
 #   COPY     byte-identical unlinked copy
 #   DIVERGED differs in a way substitution does not explain
 #   NOCANON  no canonical counterpart (repo-local file)
+# Render a canonical file into the sanctioned TEMPLATE form.
+#
+# THE ONE IMPLEMENTATION OF THE RULE. Whoever re-syncs the template must produce
+# exactly this, and the SUBST check below verifies against exactly this — one
+# function, so the generator and the gate cannot disagree. They did disagree while
+# this was being written: a plain `sed` over every line was the gate, while the
+# re-sync skipped rule lines, so a correctly-synced file read as DIVERGED.
+#
+# WHY SOME LINES ARE SKIPPED. A line mentioning BOTH a literal token and its
+# placeholder is a substitution rule, or prose describing one. Rewriting it turns
+# `s/chloeai/{{AI}}ai/g` into `s/{{AI}}ai/{{AI}}ai/g` — a no-op that silently
+# disables the template's own canonicality gate. The exception is small and exact:
+# it is not "leave the file alone", which is the reasoning that shipped a template
+# sweep.sh hunting for another AI's files.
+template_form() {
+  awk '
+    ($0 ~ /{{AI}}ai/ && $0 ~ /\{\{AI\}\}ai/) ||
+    ($0 ~ /hey{{HUMAN}}/   && $0 ~ /hey\{\{HUMAN\}\}/) { print; next }
+    { gsub(/chloeai/, "{{AI}}ai"); gsub(/heywy/, "hey{{HUMAN}}"); print }
+  ' "$1"
+}
+
 canonical_state() {
   local lf="$1" cf="$2"
   [ -f "$cf" ] || { echo NOCANON; return; }
   [ -e "$lf" ] || { echo DIVERGED; return; }
   [ "$lf" -ef "$cf" ] && { echo LINKED; return; }
-  diff -q <(sed 's/chloeai/{{AI}}ai/g' "$cf") "$lf" >/dev/null 2>&1 && { echo SUBST; return; }
+  diff -q <(template_form "$cf") "$lf" >/dev/null 2>&1 && { echo SUBST; return; }
   diff -q "$cf" "$lf" >/dev/null 2>&1 && { echo COPY; return; }
   echo DIVERGED
 }
@@ -788,7 +839,7 @@ maintenance_report() {
         # substitutes), so there the restore is a re-sync; everywhere else the
         # invariant is a symlink and the restore is a relink.
         if [ -f init-project.sh ]; then
-          chloe_lines="${chloe_lines}    skill ${sn} behind canonical (${drift# }) -> re-sync from ${cs}/${sn}, applying chloeai -> {{AI}}ai"$'\n'
+          chloe_lines="${chloe_lines}    skill ${sn} behind canonical (${drift# }) -> re-sync from ${cs}/${sn}, applying chloeai -> {{AI}}ai AND heywy -> hey{{HUMAN}}, EXCEPT on lines carrying or describing a substitution rule"$'\n'
         else
           chloe_lines="${chloe_lines}    skill ${sn} unlinked and DIVERGED (${drift# }) -> ln -sf ../../../.claude/skills/${sn} ${sd}"$'\n'
         fi
@@ -951,7 +1002,7 @@ CURRENT_CATEGORY="untracked-docs"
 section "Untracked important docs"
 if [ -d .git ]; then
   untracked_important=$(git ls-files --others --exclude-standard 2>/dev/null \
-    | grep -iE '(audit|findings|mission|handoff|decisions|charter|rules).*\.(md|chloeai)$' \
+    | grep -iE '(audit|findings|mission|handoff|decisions|charter|rules).*\.(md|{{AI}}ai)$' \
     || true)
   if [ -n "$untracked_important" ]; then
     while IFS= read -r f; do
@@ -1068,7 +1119,7 @@ if [ -d .git ]; then
   done < <(list_source_files)
 
   stale_seconds=$((MISSION_STALE_DAYS * 86400))
-  for sub in ai_context/CURRENT_MISSION.md readme_AI.chloeai; do
+  for sub in ai_context/CURRENT_MISSION.md readme_AI.{{AI}}ai; do
     if [ -f "$sub" ]; then
       sub_mt=$(_mtime "$sub")
       delta=$((newest_code - sub_mt))
@@ -1128,7 +1179,7 @@ done
 # double-quoted YAML scalar and a new narrative added literal inch marks
 # (8'-6" to 15'-6"), which close the string early and destroy the whole frontmatter
 # document. chloe's parse_waystone() returns None on YAMLError, so the registry
-# silently DROPPED the card: that repo had no WISL route at all and its heywy
+# silently DROPPED the card: that repo had no WISL route at all and its hey{{HUMAN}}
 # doorway rendered nothing. FIVE of those thirteen commits existed only to re-stamp
 # verified_at on that very card, and the repo's own lefthook reported 0 FAIL /
 # 0 WARN throughout. A freshness stamp certifies WHEN a card was last reconciled,
@@ -1229,7 +1280,7 @@ if [ -z "$WS_YAML_PARSER" ]; then
   while IFS= read -r wf; do
     { [ -z "$wf" ] || [ ! -f "$wf" ]; } && continue
     wv_n=$((wv_n+1))
-  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  done < <(find . -type f -name '_waystone.{{AI}}ai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   if [ "$wv_n" -gt 0 ]; then
     warn "waystone validity UNCHECKED: no YAML parser available (need python3 with PyYAML, or ruby). ${wv_n} card(s) not verified."
   else
@@ -1253,16 +1304,16 @@ else
              fail "waystone UNPARSEABLE: ${wf} — ${wv_res#BAD:}${wv_hint} · the runtime silently DROPS this card, so this folder has no WISL route" ;;
       *)  warn "waystone validity indeterminate: ${wf}" ;;
     esac
-  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  done < <(find . -type f -name '_waystone.{{AI}}ai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   [ "$wv_found" -eq 0 ] && pass "no waystones present (WISL not adopted in this repo)"
 fi
 
-# ── 9a. heywy doorway presence (v0.1.12) ──────────────────────
-# A root card carrying a `heywy:` inscription is written for a HUMAN to read, and
-# the way it gets read is `./_waystone.heywy`. If that doorway is missing the
+# ── 9a. hey{{HUMAN}} doorway presence (v0.1.12) ──────────────────────
+# A root card carrying a `hey{{HUMAN}}:` inscription is written for a HUMAN to read, and
+# the way it gets read is `./_waystone.hey{{HUMAN}}`. If that doorway is missing the
 # inscription is unreachable from where the reader stands.
 #
-# WHY (SESSION-085): the workspace root card had a full heywy block written for Wy
+# WHY (SESSION-085): the workspace root card had a full hey{{HUMAN}} block written for Wy
 # since ADR-015 and NO doorway — he went to ~/GitHub to read it and found nothing.
 # All 11 repos had one; the one place he actually stands to see the whole fleet did
 # not. Nothing anywhere checked, which is why it survived. Folded into
@@ -1270,21 +1321,21 @@ fi
 # ARMED gate — validate-substrate would have been the tidier home but runs in no
 # lefthook at all, so a check there would have been inert. Same lesson as the rest
 # of this file: a gate nothing triggers is not a gate.
-if [ -f _waystone.chloeai ] && grep -qE '^heywy:' _waystone.chloeai 2>/dev/null; then
+if [ -f _waystone.{{AI}}ai ] && grep -qE '^hey{{HUMAN}}:' _waystone.{{AI}}ai 2>/dev/null; then
   # The template ships a tokenized name (_waystone.hey{{HUMAN}}) until init substitutes it.
-  if ls _waystone.heywy >/dev/null 2>&1 || ls _waystone.hey*'}' >/dev/null 2>&1; then
-    if [ -e _waystone.heywy ] || ls _waystone.hey*'}' >/dev/null 2>&1; then
-      pass "heywy doorway present (the inscription is reachable)"
+  if ls _waystone.hey{{HUMAN}} >/dev/null 2>&1 || ls _waystone.hey*'}' >/dev/null 2>&1; then
+    if [ -e _waystone.hey{{HUMAN}} ] || ls _waystone.hey*'}' >/dev/null 2>&1; then
+      pass "hey{{HUMAN}} doorway present (the inscription is reachable)"
     else
-      fail "heywy doorway DANGLES: _waystone.heywy exists but resolves to nothing — the inscription is unreadable"
+      fail "hey{{HUMAN}} doorway DANGLES: _waystone.hey{{HUMAN}} exists but resolves to nothing — the inscription is unreadable"
     fi
   else
-    fail "heywy doorway MISSING: this root card carries a heywy: inscription written for a human, but no ./_waystone.heywy exists to read it through"
+    fail "hey{{HUMAN}} doorway MISSING: this root card carries a hey{{HUMAN}}: inscription written for a human, but no ./_waystone.hey{{HUMAN}} exists to read it through"
   fi
 fi
 
 # ── 9b. WISL waystone freshness (v0.1.8: recency-based, staged-aware, lag-free) ──
-# For each _waystone.chloeai: verified_at must parse + resolve (dangling-sha check),
+# For each _waystone.{{AI}}ai: verified_at must parse + resolve (dangling-sha check),
 # and the waystone must have been touched at least as RECENTLY as any file it owns
 # (excluding itself). Recency replaced the old `verified_at..HEAD` SHA-range diff,
 # which lagged: verified_at can't point to the in-flight commit, so the diff always
@@ -1332,7 +1383,7 @@ if [ -d .git ]; then
       continue
     fi
     # Freshness by RECENCY (staged-aware), EXCLUDING the waystone file itself.
-    owned_staged=$(git diff --cached --name-only -- $globs ':(exclude)**/_waystone.chloeai' 2>/dev/null)
+    owned_staged=$(git diff --cached --name-only -- $globs ':(exclude)**/_waystone.{{AI}}ai' 2>/dev/null)
     ws_staged=0; git diff --cached --quiet -- "$wf" 2>/dev/null || ws_staged=1
     if [ -n "$owned_staged" ]; then
       # Owned files are part of THIS commit → the waystone must be re-stamped with them.
@@ -1346,7 +1397,7 @@ if [ -d .git ]; then
       pass "waystone fresh (re-stamp staged): ${wf}"
     else
       # Nothing staged → committed-recency comparison (CI clean-checkout path).
-      owned_last=$(git log -1 --format=%ct -- $globs ':(exclude)**/_waystone.chloeai' 2>/dev/null)
+      owned_last=$(git log -1 --format=%ct -- $globs ':(exclude)**/_waystone.{{AI}}ai' 2>/dev/null)
       ws_last=$(git log -1 --format=%ct -- "$wf" 2>/dev/null)
       if [ -n "$owned_last" ] && { [ -z "$ws_last" ] || [ "$owned_last" -gt "$ws_last" ]; }; then
         fail "waystone STALE: ${wf} — owned file(s) committed more recently than the waystone (${ws_field} ${sha}); re-read the folder + re-stamp ${ws_field}"
@@ -1354,7 +1405,7 @@ if [ -d .git ]; then
         pass "waystone fresh: ${wf} (${ws_field} ${sha})"
       fi
     fi
-  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  done < <(find . -type f -name '_waystone.{{AI}}ai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   [ "$ws_found" -eq 0 ] && pass "no waystones present (WISL not adopted in this repo)"
 fi
 
@@ -1370,7 +1421,7 @@ fi
 # this) it prints nothing at all, so it cannot make a commit noisy. The point is to
 # ACCUMULATE AGES across the fleet first and set a threshold from data — a guessed
 # number produces a gate that fires wrong, and a gate that fires wrong gets ignored.
-# See seam-coverage-definition.chloeai §5 for the same rollout discipline.
+# See seam-coverage-definition.{{AI}}ai §5 for the same rollout discipline.
 #
 # The field is a QUOTED git sha, matching verified_at, not a hand-typed date: a sha
 # resolves to a real commit time and cannot be typo'd into a plausible-looking lie.
@@ -1381,7 +1432,7 @@ fi
 #
 # Deliberately NOT a blanket "you are on a branch" warning, which would fire on every
 # feature commit and be tuned out within a day. And deliberately NOT including
-# _waystone.chloeai: the freshness gate REQUIRES a card to be re-stamped alongside the
+# _waystone.{{AI}}ai: the freshness gate REQUIRES a card to be re-stamped alongside the
 # owned code it describes, so cards legitimately move on feature branches constantly —
 # warning on them would punish the behaviour another gate mandates.
 #
@@ -1401,7 +1452,7 @@ else
     pass "branch-context: on ${bc_branch:-detached} (default ${bc_default})"
   else
     bc_gov=$(git diff --cached --name-only 2>/dev/null \
-      | grep -E '^(lefthook\.yml|CLAUDE\.md|AGENTS\.md|STARTUP_AI\.chloeai|\.claude/)' || true)
+      | grep -E '^(lefthook\.yml|CLAUDE\.md|AGENTS\.md|STARTUP_AI\.{{AI}}ai|\.claude/)' || true)
     if [ -n "$bc_gov" ]; then
       bc_n=$(printf '%s\n' "$bc_gov" | grep -c .)
       soft_fail "branch-context: ${bc_n} repo-governing file(s) staged on '${bc_branch}', not the default '${bc_default}' — these set the rules for EVERY commit here, so on a branch they stay inert until merge: $(printf '%s' "$bc_gov" | tr '\n' ' ')"
@@ -1419,7 +1470,7 @@ fi
 # is editable by forgetting, structurally blind to a folder nobody ever declared. It
 # reported 100% for a fleet measured here at 23%. Both numbers are correct; only one
 # is called coverage. Full argument + the rejected alternatives:
-# .repo-manager/standards/WISL/seam-coverage-definition.chloeai (ACCEPTED §4).
+# .repo-manager/standards/WISL/seam-coverage-definition.{{AI}}ai (ACCEPTED §4).
 #
 # REPORT-ONLY per §5. A low ratio is not automatically a defect — `owns` scopes the
 # FRESHNESS gate, not orientation, and the repoManager root card deliberately excludes
@@ -1431,7 +1482,7 @@ section "WISL ownership coverage (report-only)"
 if [ ! -d .git ]; then
   pass "ownership-coverage: not a git repo — skipping"
 else
-  oc_globs=$(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null \
+  oc_globs=$(find . -type f -name '_waystone.{{AI}}ai' -not -path './.git/*' 2>/dev/null \
     | xargs -I{} awk '/^owns:/{f=1;next} f&&/^[[:space:]]+-[[:space:]]/{sub(/^[[:space:]]+-[[:space:]]/,"");gsub(/"/,"");print;next} f&&/^[^[:space:]]/{f=0}' {} 2>/dev/null \
     | sort -u)
   if [ -z "$oc_globs" ]; then
@@ -1506,7 +1557,7 @@ else
     # Mirrors default_budget: an all-waystone boot_path is an INDEX card and gets 8
     # slots (breadth); anything else is a code seam and gets 4 (depth).
     bs_total=$(printf '%s\n' "$bs_entries" | grep -c .)
-    bs_stones=$(printf '%s\n' "$bs_entries" | grep -c '_waystone\.chloeai$' || true)
+    bs_stones=$(printf '%s\n' "$bs_entries" | grep -c '_waystone\.{{AI}}ai$' || true)
     if [ "$bs_total" -eq "$bs_stones" ]; then bs_files=8; else bs_files=4; fi
     bs_cap=$((16384 / bs_files))
     bs_dir=$(dirname "$wf")
@@ -1520,7 +1571,7 @@ else
         bs_flagged=$((bs_flagged+1))
       fi
     done < <(printf '%s\n' "$bs_entries")
-  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  done < <(find . -type f -name '_waystone.{{AI}}ai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   if [ "$bs_cards" -eq 0 ]; then
     pass "boot-source-size: no cards with a boot_path"
   elif [ "$bs_flagged" -eq 0 ]; then
@@ -1548,7 +1599,7 @@ else
       continue
     fi
     pass "validation-age: ${wf} — $(( ( $(date +%s) - va_time ) / 86400 ))d since the validation: command last passed (${va_sha})"
-  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  done < <(find . -type f -name '_waystone.{{AI}}ai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   [ "$va_seen" -eq 0 ] && pass "validation-age: no cards carry validated_at (field not yet adopted)"
 fi
 
@@ -1607,7 +1658,7 @@ while IFS= read -r wf; do
     pass "validation-liveness: ${wf} — ${vl_verdict}"
     vl_dead=$((vl_dead+1))
   fi
-done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+done < <(find . -type f -name '_waystone.{{AI}}ai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
 if [ "$vl_seen" -eq 0 ]; then
   pass "validation-liveness: no cards carry a validation: field"
 elif [ "$vl_dead" -eq 0 ]; then
@@ -1643,7 +1694,7 @@ else
     ca_stamped=$((ca_stamped+1))
     ca_days=$(( ( $(date +%s) - ca_time ) / 86400 ))
     pass "continuity-age: ${wf} — ${ca_days}d since continuity_updated (${ca_sha})"
-  done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+  done < <(find . -type f -name '_waystone.{{AI}}ai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   if [ "$ca_found" -eq 0 ]; then
     pass "continuity-age: no cards carry a continuity: field"
   else
@@ -1652,7 +1703,7 @@ else
 fi
 
 # ── 10. Up-sync hint freshness ────────────────────────────────
-# Opt-in by ai_context/upsync.chloeai presence. Where a repo publishes workspace-
+# Opt-in by ai_context/upsync.{{AI}}ai presence. Where a repo publishes workspace-
 # relevant deltas UP (a shipped version, a stale ROSTER focus, a cross-cutting
 # finding), the hint ledger must not lag readme_AI.
 #
@@ -1673,27 +1724,27 @@ fi
 # binds folder edits to a waystone re-stamp; this binds repo state to an up-sync.)
 CURRENT_CATEGORY="up-sync"
 section "Up-sync hint freshness"
-if [ ! -f ai_context/upsync.chloeai ]; then
-  pass "up-sync not configured (no ai_context/upsync.chloeai)"
+if [ ! -f ai_context/upsync.{{AI}}ai ]; then
+  pass "up-sync not configured (no ai_context/upsync.{{AI}}ai)"
 elif [ ! -d .git ]; then
   pass "up-sync: not a git repo — skipping"
 else
   # Staged (index vs HEAD): non-zero exit ⇒ that path is part of this commit.
-  readme_staged=0; git diff --cached --quiet -- readme_AI.chloeai 2>/dev/null || readme_staged=1
-  hint_staged=0;   git diff --cached --quiet -- ai_context/upsync.chloeai 2>/dev/null || hint_staged=1
+  readme_staged=0; git diff --cached --quiet -- readme_AI.{{AI}}ai 2>/dev/null || readme_staged=1
+  hint_staged=0;   git diff --cached --quiet -- ai_context/upsync.{{AI}}ai 2>/dev/null || hint_staged=1
   if [ "$readme_staged" -eq 1 ] || [ "$hint_staged" -eq 1 ]; then
     # This commit touches the substrate pair — require them to move together.
     if [ "$readme_staged" -eq 1 ] && [ "$hint_staged" -eq 0 ]; then
-      soft_fail "up-sync stale: readme_AI is staged without an ai_context/upsync.chloeai block — stage an up-sync block in the same commit (timestamps match)"
+      soft_fail "up-sync stale: readme_AI is staged without an ai_context/upsync.{{AI}}ai block — stage an up-sync block in the same commit (timestamps match)"
     else
       pass "up-sync hint current (upsync staged with this change)"
     fi
   else
     # Nothing staged → committed-history comparison (CI clean-checkout path, unchanged).
-    last_readme=$(git log -1 --format=%ct -- readme_AI.chloeai 2>/dev/null)
-    last_hint=$(git log -1 --format=%ct -- ai_context/upsync.chloeai 2>/dev/null)
+    last_readme=$(git log -1 --format=%ct -- readme_AI.{{AI}}ai 2>/dev/null)
+    last_hint=$(git log -1 --format=%ct -- ai_context/upsync.{{AI}}ai 2>/dev/null)
     if [ -z "$last_hint" ] || { [ -n "$last_readme" ] && [ "$last_readme" -gt "$last_hint" ]; }; then
-      soft_fail "up-sync stale: readme_AI moved since the last published hint — append an ai_context/upsync.chloeai block (commit it WITH the substrate change so timestamps match)"
+      soft_fail "up-sync stale: readme_AI moved since the last published hint — append an ai_context/upsync.{{AI}}ai block (commit it WITH the substrate change so timestamps match)"
     else
       pass "up-sync hint current (readme_AI not ahead of last hint)"
     fi
@@ -1704,7 +1755,7 @@ fi
 # The tool-agnostic WRITE-edge floor (ADR-BOOT-001): every agent commits through
 # git, so the wrap gate lives here — not only in Claude's SessionStart hooks,
 # which Codex never fires (the OFS SL-001/THR-004 gap). Carrier = the repo's
-# session-continuity file: readme_AI.chloeai in-repo, or the workspace HANDOFF
+# session-continuity file: readme_AI.{{AI}}ai in-repo, or the workspace HANDOFF
 # log in the substrate repo (override via WRAP_CARRIER in drift-sweep.conf).
 # Staged-aware: a commit that moves the carrier IS the wrap — passes. Otherwise
 # the carrier must not lag HEAD by more than WRAP_LAG_WARN commits (default 10);
@@ -1721,10 +1772,10 @@ if [ ! -d .git ]; then
 else
   wrap_carrier="${WRAP_CARRIER}"
   if [ -z "$wrap_carrier" ]; then
-    if [ -f readme_AI.chloeai ]; then
-      wrap_carrier="readme_AI.chloeai"
-    elif [ -f .claude/skills/hi-mode/HANDOFF_LOG.chloeai ]; then
-      wrap_carrier=".claude/skills/hi-mode/HANDOFF_LOG.chloeai"
+    if [ -f readme_AI.{{AI}}ai ]; then
+      wrap_carrier="readme_AI.{{AI}}ai"
+    elif [ -f .claude/skills/hi-mode/HANDOFF_LOG.{{AI}}ai ]; then
+      wrap_carrier=".claude/skills/hi-mode/HANDOFF_LOG.{{AI}}ai"
     fi
   fi
   if [ -z "$wrap_carrier" ] || [ ! -f "$wrap_carrier" ]; then
@@ -1750,7 +1801,7 @@ else
 fi
 
 # ── 12. WISL waystone graph connectivity ──────────────────────
-# For each _waystone.chloeai: every depends_on (a folder) and boot_path (a file or
+# For each _waystone.{{AI}}ai: every depends_on (a folder) and boot_path (a file or
 # dir) edge must resolve on disk. Self-propagation (WISL-STANDARD §design intent)
 # requires the graph to actually connect — a dangling edge means the next AI lands
 # on a card pointing at a moved/renamed/typo'd path. Parses FRONTMATTER ONLY (between
@@ -1783,7 +1834,7 @@ while IFS= read -r wf; do
       fi
     done <<< "$entries"
   done
-done < <(find . -type f -name '_waystone.chloeai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
+done < <(find . -type f -name '_waystone.{{AI}}ai' -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
 if [ "$wg_found" -eq 0 ]; then
   pass "wisl-graph: no waystones present (WISL not adopted in this repo)"
 elif [ "$wg_dangling" -eq 0 ]; then
@@ -1791,7 +1842,7 @@ elif [ "$wg_dangling" -eq 0 ]; then
 fi
 
 # ── 13. WISL seam coverage ────────────────────────────────────
-# A folder the seam map declares a 'needed' or 'live' seam MUST carry a _waystone.chloeai
+# A folder the seam map declares a 'needed' or 'live' seam MUST carry a _waystone.{{AI}}ai
 # (catches a MISSING card, which waystone-freshness can't — it only catches STALE ones).
 # Reads the workspace seam-coverage projection (whitespace: repo folder status). Runs at
 # lefthook/boot only — the workspace file is absent in a single-repo CI checkout, where this
@@ -1822,8 +1873,8 @@ else
       [ "$r" = "$repo_name" ] || continue
       case "$status" in needed|live) ;; *) continue ;; esac
       sc_checked=$((sc_checked+1))
-      if [ ! -f "${folder}/_waystone.chloeai" ]; then
-        soft_fail "seam-coverage: ${repo_name}/${folder} is a '${status}' seam with no _waystone.chloeai"
+      if [ ! -f "${folder}/_waystone.{{AI}}ai" ]; then
+        soft_fail "seam-coverage: ${repo_name}/${folder} is a '${status}' seam with no _waystone.{{AI}}ai"
         sc_missing=$((sc_missing+1))
       fi
     done < "$seam_tsv"
@@ -1886,7 +1937,7 @@ else
         hc_bad=$((hc_bad+1))
       elif [ "$hf" -ef "$cf" ]; then
         :  # linked to canonical — the intended state
-      elif diff -q <(sed 's/chloeai/{{AI}}ai/g' "$cf") "$hf" >/dev/null 2>&1; then
+      elif diff -q <(template_form "$cf") "$hf" >/dev/null 2>&1; then
         :  # sanctioned template form: canonical + placeholder substitution
       elif diff -q "$cf" "$hf" >/dev/null 2>&1; then
         warn "hook-canonical: ${hb} is an unlinked COPY that currently matches the canonical — symlink it (ln -sf ../../../.claude/hooks/${hb}) before it drifts like handoff-gate.sh did"
