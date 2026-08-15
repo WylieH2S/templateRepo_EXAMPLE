@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.21 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.22 — detect code/substrate drift in a repo.
+#
+# v0.1.22 (SESSION-092, 2026-08-15): `--backstop-only` — the v0.1.21 probe, reachable
+# from a boot.
+#
+# v0.1.21 built the backstop check and put it behind `--maintenance`. Five days later
+# the backstop had failed FIFTEEN consecutive nights and still nobody had seen it,
+# because nothing ever ran the check: the charter invokes the boot sweep only when the
+# working tree is DIRTY, and its `--fail-on` list does not include maintenance. On
+# 2026-08-14 the tree was clean, so the sweep did not run at all — the dead backstop
+# surfaced only because a session went looking by hand.
+#
+# THE LESSON IS NOT ABOUT CI. Building the check and leaving it on a manual path
+# reproduced, one release later, the very failure the check was written to catch: a
+# mechanism that exists but is not wired to an edge anyone actually crosses. This flag
+# emits just the backstop lines so the SessionStart wrap-gate — which runs
+# unconditionally at EVERY boot, clean tree or not — can carry it.
+#
+# The hook calls this rather than carrying its own copy, and that is deliberate: see
+# the note at the --backstop-only dispatch below.
 #
 # v0.1.21 (SESSION-091, 2026-08-10): `--maintenance` now reports BACKSTOP HEALTH.
 #
@@ -308,6 +327,7 @@ FAIL_ON_CATEGORIES=""
 SELF="${BASH_SOURCE[0]}"
 FLEET_MODE=0
 MAINTENANCE_MODE=0
+BACKSTOP_ONLY=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -315,6 +335,7 @@ while [ $# -gt 0 ]; do
     --quiet) QUIET_OUTPUT=1; shift ;;
     --fleet) FLEET_MODE=1; shift ;;
     --maintenance) MAINTENANCE_MODE=1; shift ;;
+    --backstop-only) BACKSTOP_ONLY=1; shift ;;
     --fail-on=*) FAIL_ON_CATEGORIES="${1#--fail-on=}"; shift ;;
     -*) echo "Unknown flag: $1" >&2; exit 1 ;;
     *) REPO="$1"; shift ;;
@@ -643,6 +664,26 @@ _days_since_iso() {
   now=$(date -u +%s)
   echo $(( (now - then) / 86400 ))
 }
+
+# ── --backstop-only ───────────────────────────────────────────
+# Emit JUST the backstop health lines and exit 0. Exists so the SessionStart
+# wrap-gate can surface a dead backstop at EVERY boot without running a full sweep
+# and without carrying its own copy of the probe.
+#
+# WHY A FLAG AND NOT A COPY IN THE HOOK: this is the SESSION-089 lesson applied
+# before it can bite again. Skills are symlinks to one canonical file and have never
+# drifted; hooks were copies and rotted into three versions across eleven repos while
+# reporting "skipping", which reads as a pass. A second implementation of this probe
+# living in wrap-gate.sh would be a new copy with no invariant holding it to this one.
+#
+# Prints nothing at all when the backstop is green and current, when this is not the
+# repo that owns the workflow, or when BACKSTOP_CHECK=0 — the caller treats empty
+# output as "nothing to say" and stays silent too.
+if [ "$BACKSTOP_ONLY" = "1" ]; then
+  cd "$REPO" 2>/dev/null || exit 0
+  backstop_report
+  exit 0
+fi
 
 maintenance_report() {
   local repo_label; repo_label=$(basename "$(pwd)")

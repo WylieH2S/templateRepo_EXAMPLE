@@ -96,6 +96,47 @@ if git -C "$R" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&
   fi
 fi
 
+# --- 5. server-side backstop health (only in the repo that OWNS the workflow) ---
+#
+# WHY THIS LIVES IN A SessionStart HOOK. The check itself already existed —
+# drift-sweep --maintenance has reported backstop health since v0.1.21 — but nothing
+# made a boot RUN it. The charter runs the boot sweep only when the tree is DIRTY,
+# and its --fail-on list does not include maintenance. On 2026-08-14 the tree was
+# clean, so the sweep never ran, and fourteen consecutive nightly failures had gone
+# unseen for four days. A check reachable only by deliberate manual invocation is the
+# skippable edge this fleet keeps re-learning (see the repo-manager memory
+# feedback-mechanize-every-skippable-edge, and SESSION-039, which gated the boot and
+# publish edges and left the wrap edge open until it recurred).
+#
+# COST IS SCOPED TO ONE REPO: the guard is the workflow file, which exists only in
+# repoManager, so the other ten fleet repos do no network work and print nothing.
+# Set BACKSTOP_CHECK=0 to opt out entirely.
+#
+# Deliberately NOT folded into `issues`: a red backstop is not a wrap failure, and
+# reporting "WRAP gate: 1 unresolved item" for a CI credential would make one banner
+# mean two different things. It gets its own band, below the wrap verdict.
+_bs_wf="${BACKSTOP_WORKFLOW:-fleet-sweep.yml}"
+backstop_lines=""
+if [ -f "$R/.github/workflows/${_bs_wf}" ]; then
+  _sweep="$SCRIPT_DIR/../skills/drift-sweep/sweep.sh"
+  if [ -f "$_sweep" ]; then
+    # ONE bound around the whole probe. backstop_report times out its own gh call,
+    # but it makes up to three (auth status, repo view, run list) and a boot must not
+    # be held hostage to a bad network. `timeout` is GNU; macOS gets it as gtimeout
+    # via coreutils; where neither exists we accept gh's own timeouts rather than
+    # block. Never allowed to affect exit status — this hook always exits 0.
+    _to=""
+    if command -v timeout  >/dev/null 2>&1; then _to="timeout 20"
+    elif command -v gtimeout >/dev/null 2>&1; then _to="gtimeout 20"; fi
+    # shellcheck disable=SC2086
+    backstop_lines=$($_to bash "$_sweep" --backstop-only "$R" 2>/dev/null || true)
+  else
+    # Loud, not silent. This whole category exists because absence of signal got read
+    # as health for four days; a missing probe must not print like a green one.
+    backstop_lines="    backstop ${_bs_wf}: COULD NOT CHECK — drift-sweep not found at ${_sweep}"
+  fi
+fi
+
 note=""
 [ "$src" = "compact" ] && note=" (post-compaction re-entry)"
 
@@ -105,5 +146,11 @@ else
   echo "⚠ WRAP gate${note}: ${issues} unresolved item(s) in $(basename "$R") — a prior session may not have wrapped:"
   printf '%s' "$details"
   echo "   → Resolve before the first non-read action: append the HANDOFF block, commit, push on the owner's go (HI Mode SESSION WRAP)."
+fi
+
+# Silent when green and current, when this repo owns no backstop, or when opted out.
+if [ -n "$backstop_lines" ]; then
+  echo "⚠ BACKSTOP (server-side CI — what catches a bypassed local gate):"
+  printf '%s\n' "$backstop_lines"
 fi
 exit 0
