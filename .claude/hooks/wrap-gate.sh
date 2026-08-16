@@ -120,16 +120,33 @@ backstop_lines=""
 if [ -f "$R/.github/workflows/${_bs_wf}" ]; then
   _sweep="$SCRIPT_DIR/../skills/drift-sweep/sweep.sh"
   if [ -f "$_sweep" ]; then
-    # ONE bound around the whole probe. backstop_report times out its own gh call,
-    # but it makes up to three (auth status, repo view, run list) and a boot must not
-    # be held hostage to a bad network. `timeout` is GNU; macOS gets it as gtimeout
-    # via coreutils; where neither exists we accept gh's own timeouts rather than
-    # block. Never allowed to affect exit status — this hook always exits 0.
-    _to=""
-    if command -v timeout  >/dev/null 2>&1; then _to="timeout 20"
-    elif command -v gtimeout >/dev/null 2>&1; then _to="gtimeout 20"; fi
-    # shellcheck disable=SC2086
-    backstop_lines=$($_to bash "$_sweep" --backstop-only "$R" 2>/dev/null || true)
+    # ONE bound around the whole probe. backstop_report bounds each of its own gh
+    # calls, but it makes three of them and a BOOT must never be held hostage to a
+    # bad network. Never allowed to affect exit status — this hook always exits 0.
+    #
+    # THE BOUND USED TO NOT EXIST HERE (2026-08-16). It was `timeout 20` where
+    # `timeout`/`gtimeout` was found and an EMPTY STRING otherwise, with a comment
+    # saying we'd "accept gh's own timeouts". Stock macOS ships neither binary and
+    # this fleet's primary machine is a Mac, so on the box this hook was written
+    # for there was no bound at all — and `gh` has no whole-operation deadline to
+    # fall back on. It stopped being theoretical when this exact line ran past two
+    # minutes on the boot path and had to be killed by hand. Now a bash-native
+    # watchdog: background the probe, kill it on expiry, no coreutils required.
+    _bs_pid=""; _bs_out="$(mktemp)"
+    bash "$_sweep" --backstop-only "$R" >"$_bs_out" 2>/dev/null &
+    _bs_pid=$!
+    ( sleep 20; kill -TERM "$_bs_pid" 2>/dev/null ) >/dev/null 2>&1 &
+    _bs_wd=$!
+    if wait "$_bs_pid" 2>/dev/null; then
+      backstop_lines=$(cat "$_bs_out")
+    else
+      # Killed or failed. Say so — a probe that did not complete is a THIRD state,
+      # neither green nor red, and printing nothing would make it look like green.
+      backstop_lines=$(cat "$_bs_out")
+      [ -n "$backstop_lines" ] || backstop_lines="    backstop ${_bs_wf}: COULD NOT CHECK — probe exceeded its 20s bound or failed (network? gh auth?)"
+    fi
+    kill -TERM "$_bs_wd" 2>/dev/null; wait "$_bs_wd" 2>/dev/null
+    rm -f "$_bs_out"
   else
     # Loud, not silent. This whole category exists because absence of signal got read
     # as health for four days; a missing probe must not print like a green one.

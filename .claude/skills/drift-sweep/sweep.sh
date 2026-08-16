@@ -1,5 +1,25 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.26 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.27 — detect code/substrate drift in a repo.
+#
+# v0.1.27 (SESSION-093, 2026-08-16): `_bounded` — the network guard that was
+# never actually there on this fleet's own machine.
+#
+# The backstop probe wrote `to="timeout 15"` when `timeout` or `gtimeout` was
+# found and an EMPTY STRING otherwise, on the reasoning that we would then "fall
+# through to gh's own HTTP timeout". Stock macOS ships NEITHER binary, this
+# fleet's primary machine is a Mac, and `gh` has no whole-operation deadline —
+# so on the box these guards were written for, there was no bound at all. Two of
+# the three gh calls were unbounded even where `timeout` exists.
+#
+# It stopped being theoretical today: `wrap-gate.sh` — a SessionStart hook, so
+# the BOOT PATH — ran past two minutes on a gh call and had to be killed by hand.
+# Replaced with a bash-native watchdog (background, kill on expiry) that needs no
+# coreutils, applied to all three gh calls and to the hook's own outer bound.
+#
+# Same species as the v0.1.23 `_mtime` bug: a portability assumption that made
+# part of the mechanism silently absent on a real platform. Worse in one respect
+# — there a CHECK could not run and reported nothing; here a GUARD could not run,
+# and an absent guard produces no output at all until something hangs.
 #
 # v0.1.26 (SESSION-093, 2026-08-16): NEW `doc-version` category — the fleet
 # gated code-vs-substrate drift and nothing gated code-vs-its-own-documentation.
@@ -702,6 +722,38 @@ is_declared_fork() {
 # exists because absence of signal got read as health for four days. If gh is missing,
 # logged out, or the network is down, that is a DIFFERENT state from "green" and must
 # not print like it. The one thing this must never do is stay silent.
+# _bounded <seconds> <command...> — run a command with a hard wall-clock bound.
+#
+# THE GUARD THAT WASN'T THERE (v0.1.27, 2026-08-16). This used to be
+# `to="timeout 15"` when `timeout` or `gtimeout` was found, and an EMPTY STRING
+# otherwise — with a comment saying we then "fall through to gh's own HTTP
+# timeout". Stock macOS has neither binary, and this fleet's primary machine is
+# a Mac: on the box this was written for, the bound was simply absent. It stopped
+# being theoretical today, when `wrap-gate.sh` — a SessionStart hook, so this is
+# the BOOT PATH — ran past two minutes on a `gh` call and had to be killed by
+# hand. `gh`'s own timeout did not save it, because `gh` has no default deadline
+# for the whole operation.
+#
+# Same species as the `_mtime` bug in v0.1.23: a portability assumption that made
+# a piece of the mechanism silently absent on a real platform. Worse in one way —
+# there, a CHECK could not run and reported nothing; here a GUARD could not run,
+# and an absent guard has no output at all until something hangs.
+#
+# The fallback is a plain bash watchdog: run in background, kill on expiry. No
+# coreutils, no dependency, works everywhere bash does.
+_bounded() {
+  local secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$secs" "$@"; return $?; fi
+  if command -v gtimeout >/dev/null 2>&1; then gtimeout "$secs" "$@"; return $?; fi
+  "$@" &
+  local pid=$! rc=0
+  ( sleep "$secs"; kill -TERM "$pid" 2>/dev/null ) >/dev/null 2>&1 &
+  local wd=$!
+  wait "$pid" 2>/dev/null; rc=$?
+  kill -TERM "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
+  return "$rc"
+}
+
 backstop_report() {
   local wf="${BACKSTOP_WORKFLOW}"
   [ "${BACKSTOP_CHECK}" = "1" ] || return 0
@@ -710,26 +762,19 @@ backstop_report() {
   if ! command -v gh >/dev/null 2>&1; then
     printf '    backstop %s: COULD NOT CHECK — gh not installed\n' "$wf"; return 0
   fi
-  if ! gh auth status >/dev/null 2>&1; then
+  if ! _bounded 10 gh auth status >/dev/null 2>&1; then
     printf '    backstop %s: COULD NOT CHECK — gh not authenticated (gh auth login)\n' "$wf"; return 0
   fi
 
-  # `timeout` is GNU and absent from a stock macOS; coreutils installs it as gtimeout.
-  # Where neither exists we fall through to gh's own HTTP timeout rather than block
-  # a maintenance report indefinitely on a bad network.
-  local to=""
-  if command -v timeout  >/dev/null 2>&1; then to="timeout 15"
-  elif command -v gtimeout >/dev/null 2>&1; then to="gtimeout 15"; fi
-
   local slug runs
-  slug=$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || slug=""
+  slug=$(_bounded 15 gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null) || slug=""
   [ -n "$slug" ] || { printf '    backstop %s: COULD NOT CHECK — no GitHub remote resolved\n' "$wf"; return 0; }
 
   # ONE call, and gh's OWN --jq does the aggregation — no external jq dependency and
   # no second round-trip. Emitting a single tab-separated line keeps the shell side to
   # a plain read: a captured JSON blob cannot be re-filtered by gh afterwards.
   local errf; errf=$(mktemp 2>/dev/null || echo /tmp/ds_backstop.$$)
-  runs=$($to gh run list --repo "$slug" --workflow="$wf" --limit 20 \
+  runs=$(_bounded 15 gh run list --repo "$slug" --workflow="$wf" --limit 20 \
            --json conclusion,createdAt,databaseId \
            --jq '"\(.[0].conclusion // "in_progress")\t\(.[0].createdAt)\t\(.[0].databaseId)\t\([.[]|select(.conclusion!="success")]|length)\t\([.[]|select(.conclusion=="success")]|length)\t\(length)"' \
            2>"$errf") || runs=""
