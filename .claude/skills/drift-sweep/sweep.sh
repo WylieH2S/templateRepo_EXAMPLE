@@ -1,5 +1,29 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.24 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.25 — detect code/substrate drift in a repo.
+#
+# v0.1.25 (SESSION-093, 2026-08-16): the ladder REQUIRES template form in the
+# template, and wrap-continuity stops asking the template a question it has no
+# way to answer honestly.
+#
+# v0.1.24 made the template's copy correct. Two consequences of that were left
+# open and are closed here:
+#
+#   1. The ladder PERMITTED `SUBST` but still PASSED a plain `COPY`. A plain copy
+#      is precisely the shape that shipped the v0.1.24 defect — literal `{{AI}}ai`
+#      in a file handed to someone whose AI is not named Chloe. In the template
+#      that is not "in sync, merely unlinked", it is the bug. hook-canonical and
+#      skill-canonical now fail it there and say how to regenerate. Elsewhere a
+#      COPY stays a WARN, because elsewhere the invariant is a symlink.
+#
+#   2. `wrap-continuity` went red on the template the moment it could see it —
+#      correctly, by its own rule, and meaninglessly. Both template carriers are
+#      frozen SPECIMENS documenting the format; the template's real session
+#      record lives in the workspace HANDOFF_LOG. The only way to satisfy the
+#      check was to re-stamp a specimen to reset a counter. Documented exemption
+#      instead, keyed to a condition that cannot survive seeding.
+#
+# Both hang off a new IS_TEMPLATE discriminator that requires TWO conditions,
+# because init-project.sh's self-delete is a prompt defaulting to NO.
 #
 # v0.1.24 (SESSION-092-FOLLOWON, 2026-08-15): `template_form()` — ONE implementation
 # of the canonical→template rule, and the rule now covers BOTH name tokens.
@@ -20,9 +44,6 @@
 #      plain `sed` over every line was the gate, while the re-sync skipped
 #      substitution-rule lines, so a correctly-synced file read as DIVERGED. They
 #      are now one function — the generator and the verifier cannot disagree.
-#
-# v0.1.23 (SESSION-092, 2026-08-15): portable `_mtime`. THE BACKSTOP'S FIRST GREEN
-# CREDENTIAL IMMEDIATELY PAID FOR ITSELF.
 #
 # v0.1.23 (SESSION-092, 2026-08-15): portable `_mtime`. THE BACKSTOP'S FIRST GREEN
 # CREDENTIAL IMMEDIATELY PAID FOR ITSELF.
@@ -491,6 +512,26 @@ TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
 WRAP_CARRIER="${WRAP_CARRIER:-}"
 WRAP_LAG_WARN="${WRAP_LAG_WARN:-10}"
 
+# ── Is THIS repo the template? (v0.1.25) ──────────────────────
+# templateRepo_EXAMPLE is not a project; it is the blueprint projects are cut
+# from. Two categories have to answer differently here, and both were answering
+# wrong until 2026-08-16 (see hook-canonical / skill-canonical and
+# wrap-continuity below for what each one does with this).
+#
+# TWO CONDITIONS, not one. init-project.sh's self-delete is a PROMPT DEFAULTING
+# TO NO, so its mere presence does not mean "template" — a real seeded repo
+# whose owner pressed Enter still has it. The second condition cannot survive
+# seeding: init renames every `*.{{AI}}ai` and `*.hey{{HUMAN}}` file
+# unconditionally, no prompt. Relaxing a gate on a repo that needs the strict
+# version is the silent-pass class, so the discriminator has to be the one that
+# a seeded repo cannot accidentally satisfy.
+IS_TEMPLATE=0
+if [ -f init-project.sh ]; then
+  if compgen -G '*.{{AI}}ai' >/dev/null 2>&1 || compgen -G '*.hey{{HUMAN}}' >/dev/null 2>&1; then
+    IS_TEMPLATE=1
+  fi
+fi
+
 FAILS=0
 WARNS=0
 EXIT_FAILS=0
@@ -799,9 +840,24 @@ maintenance_report() {
     for hf in .claude/hooks/*.sh; do
       [ -e "$hf" ] || continue
       hb=$(basename "$hf"); st=$(canonical_state "$hf" "$ch/$hb")
+      # The RESTORE differs by repo kind, so the renderer has to branch the same
+      # way the gate does. In the template the answer is never "symlink it" —
+      # the template must hold real files — it is "regenerate in template form".
+      # A renderer that prescribed a symlink here would hand Chloe an action that
+      # breaks the very thing the gate is protecting.
       case "$st" in
-        DIVERGED) chloe_lines="${chloe_lines}    hook ${hb} DIVERGED -> ln -sf ../../../.claude/hooks/${hb} ${hf}"$'\n' ;;
-        COPY)     chloe_lines="${chloe_lines}    hook ${hb} unlinked copy (in sync) -> ln -sf ../../../.claude/hooks/${hb} ${hf}"$'\n' ;;
+        DIVERGED)
+          if [ "$IS_TEMPLATE" -eq 1 ]; then
+            chloe_lines="${chloe_lines}    hook ${hb} DIVERGED -> regenerate from ${ch}/${hb} in template form"$'\n'
+          else
+            chloe_lines="${chloe_lines}    hook ${hb} DIVERGED -> ln -sf ../../../.claude/hooks/${hb} ${hf}"$'\n'
+          fi ;;
+        COPY)
+          if [ "$IS_TEMPLATE" -eq 1 ]; then
+            chloe_lines="${chloe_lines}    hook ${hb} is a PLAIN COPY (literal {{AI}}ai/hey{{HUMAN}}) -> regenerate from ${ch}/${hb} in template form"$'\n'
+          else
+            chloe_lines="${chloe_lines}    hook ${hb} unlinked copy (in sync) -> ln -sf ../../../.claude/hooks/${hb} ${hf}"$'\n'
+          fi ;;
         NOCANON)  wy_lines="${wy_lines}    hook ${hb} has NO canonical counterpart — repo-local hook, or the canonical lost it"$'\n' ;;
       esac
     done
@@ -828,7 +884,12 @@ maintenance_report() {
         [ -f "$cf" ] || continue
         cb=$(basename "$cf")
         case "$(canonical_state "$sd/$cb" "$cf")" in
-          LINKED|SUBST|COPY) : ;;
+          LINKED|SUBST) : ;;
+          # Mirrors the gate: a plain COPY is fine in a real repo, and is drift
+          # in the template. The renderer and the gate must agree about what
+          # needs doing — they disagreed once already (v0.1.24) and it cost a
+          # false DIVERGED.
+          COPY) [ "$IS_TEMPLATE" -eq 1 ] && drift="${drift} ${cb}" ;;
           *) drift="${drift} ${cb}" ;;
         esac
       done
@@ -838,7 +899,7 @@ maintenance_report() {
         # sanctioned copy-holder (it ships {{AI}} placeholders that init
         # substitutes), so there the restore is a re-sync; everywhere else the
         # invariant is a symlink and the restore is a relink.
-        if [ -f init-project.sh ]; then
+        if [ "$IS_TEMPLATE" -eq 1 ]; then
           chloe_lines="${chloe_lines}    skill ${sn} behind canonical (${drift# }) -> re-sync from ${cs}/${sn}, applying chloeai -> {{AI}}ai AND heywy -> hey{{HUMAN}}, EXCEPT on lines carrying or describing a substitution rule"$'\n'
         else
           chloe_lines="${chloe_lines}    skill ${sn} unlinked and DIVERGED (${drift# }) -> ln -sf ../../../.claude/skills/${sn} ${sd}"$'\n'
@@ -1769,6 +1830,33 @@ CURRENT_CATEGORY="wrap-continuity"
 section "Wrap continuity (boot contract W1)"
 if [ ! -d .git ]; then
   pass "wrap-continuity: not a git repo — skipping"
+elif [ "$IS_TEMPLATE" -eq 1 ]; then
+  # TEMPLATE EXEMPTION (v0.1.25, 2026-08-16) — documented, not silent.
+  #
+  # This category asks "did a session here end without wrapping?" The template
+  # has no sessions to wrap. Its `readme_AI.{{AI}}ai` HANDOFF block is a frozen
+  # SPECIMEN (SESSION-001, dated 2026-04-29, placeholder threads) and so is
+  # `AI_HANDOFF.{{AI}}ai` — 1,339 bytes, untouched since 2026-05-28, still just
+  # the entry-format header. They are documentation OF the format, not a record
+  # of work. Work on the template is done from the workspace lane, and its
+  # session record lives in repoManager's HANDOFF_LOG.{{AI}}ai.
+  #
+  # So the only way to satisfy the check here is to re-stamp a specimen every
+  # ten commits purely to reset a counter. That is green-by-ritual: it teaches
+  # the reflex of editing continuity files to silence a gate, on the one repo
+  # whose whole job is to teach the right reflexes to strangers.
+  #
+  # WHY THIS IS SAFE. The exemption is keyed to IS_TEMPLATE, which requires
+  # placeholder-named substrate — a condition init destroys unconditionally at
+  # seed time. A repo cut from this template gets the check at full strength on
+  # its first commit; the exemption cannot travel with it.
+  #
+  # WHY IT WAS INVISIBLE UNTIL NOW. The template's own copy of this file was a
+  # plain COPY looking for a literal `readme_AI.{{AI}}ai`, which does not exist
+  # in a repo whose carrier is `readme_AI.{{AI}}ai`. No carrier found meant
+  # "not adopted here" — a vacuous pass for months. Fixing the copy (v0.1.24)
+  # is what surfaced the question this comment answers.
+  pass "wrap-continuity: template repo — carrier is a frozen specimen, not a session record; exempt by design (real continuity lives in the workspace HANDOFF_LOG)"
 else
   wrap_carrier="${WRAP_CARRIER}"
   if [ -z "$wrap_carrier" ]; then
@@ -1940,7 +2028,22 @@ else
       elif diff -q <(template_form "$cf") "$hf" >/dev/null 2>&1; then
         :  # sanctioned template form: canonical + placeholder substitution
       elif diff -q "$cf" "$hf" >/dev/null 2>&1; then
-        warn "hook-canonical: ${hb} is an unlinked COPY that currently matches the canonical — symlink it (ln -sf ../../../.claude/hooks/${hb}) before it drifts like handoff-gate.sh did"
+        if [ "$IS_TEMPLATE" -eq 1 ]; then
+          # In the TEMPLATE, a plain byte-identical copy is not "in sync, just
+          # unlinked" — it is the defect. It means the file carries literal
+          # `{{AI}}ai`/`hey{{HUMAN}}`, so a repo seeded under any other duo's names gets
+          # substrate pointed at files that do not exist there. That is exactly
+          # what shipped: templateRepo's sweep.sh was a plain COPY with 45
+          # literal `.{{AI}}ai`, and it reported CLEAN because it was looking for
+          # another AI's files. The ladder PERMITTED SUBST here; it has to
+          # REQUIRE it. (Note this can only fire on a file that actually differs
+          # from its template form — canonical_state returns SUBST first, so a
+          # file containing neither token still passes.)
+          soft_fail "hook-canonical: ${hb} is a PLAIN COPY in the template — it must be in template form (chloeai -> {{AI}}ai, heywy -> hey{{HUMAN}}). Regenerate with drift-sweep's own template_form()"
+          hc_bad=$((hc_bad+1))
+        else
+          warn "hook-canonical: ${hb} is an unlinked COPY that currently matches the canonical — symlink it (ln -sf ../../../.claude/hooks/${hb}) before it drifts like handoff-gate.sh did"
+        fi
       else
         soft_fail "hook-canonical: ${hb} has DIVERGED from the workspace canonical — diff it against ${cf} and relink"
         hc_bad=$((hc_bad+1))
@@ -2009,17 +2112,26 @@ else
       if [ -L "$sd" ] && [ "$sd" -ef "$csk/$sname" ]; then
         continue                              # symlinked — the intended state
       fi
-      sk_drift=""
+      sk_drift=""; sk_copy=""
       for cf in "$csk/$sname"/*; do
         [ -f "$cf" ] || continue
         cb=$(basename "$cf")
         case "$(canonical_state "$sd/$cb" "$cf")" in
-          LINKED|SUBST|COPY) : ;;
+          LINKED|SUBST) : ;;
+          # A plain COPY is acceptable in a real repo (in sync, merely unlinked)
+          # and is NOT acceptable in the template, where it means literal
+          # `{{AI}}ai`/`hey{{HUMAN}}` shipped to someone whose files are named otherwise.
+          # See the matching hook-canonical branch for the full reasoning.
+          COPY) [ "$IS_TEMPLATE" -eq 1 ] && sk_copy="${sk_copy} ${cb}" ;;
           *) sk_drift="${sk_drift} ${cb}" ;;
         esac
       done
       if [ -n "$sk_drift" ]; then
         soft_fail "skill-canonical: ${sname} tracks the canonical but has drifted:${sk_drift} — re-sync it, or declare it in CANONICAL_FORK_SKILLS if the divergence is deliberate"
+        sk_bad=$((sk_bad+1))
+      fi
+      if [ -n "$sk_copy" ]; then
+        soft_fail "skill-canonical: ${sname} ships PLAIN COPIES in the template:${sk_copy} — must be template form (chloeai -> {{AI}}ai, heywy -> hey{{HUMAN}}). Regenerate with drift-sweep's own template_form()"
         sk_bad=$((sk_bad+1))
       fi
     done

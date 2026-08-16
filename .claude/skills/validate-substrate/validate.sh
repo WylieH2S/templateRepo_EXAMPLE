@@ -22,16 +22,43 @@ fail() { echo "  ✗ $*"; FAILS=$((FAILS+1)); }
 
 section() { echo; echo "── $* ──"; }
 
-# Template mode: init-project.sh present means we're validating the template
-# itself (not a bootstrapped project). Some checks are softened in this mode
-# because placeholder tokens and unresolved EXTENDS paths are expected.
+# The two placeholder tokens, as LITERAL text, assembled from pieces so that
+# init-project.sh's substitution pass cannot rewrite them: neither `{{AI}}` nor
+# `{{HUMAN}}` ever appears contiguously in this file's source. Everywhere else
+# in this fork the tokens are written plainly BECAUSE they are meant to be
+# substituted; the two checks below are the exception — they have to keep
+# talking about an unfilled placeholder after this repo's own placeholders are
+# filled, which is only possible if the sed cannot see them.
+_PH_AI='{'"{AI}"'}'
+_PH_HUMAN='{'"{HUMAN}"'}'
+
+# Template mode: we're validating the template ITSELF, not a bootstrapped
+# project. Several checks are softened here because placeholder tokens and
+# unresolved EXTENDS paths are the correct state for a blueprint.
+#
+# TWO CONDITIONS, not one (tightened 2026-08-16). This used to test only
+# `-f init-project.sh`, and init-project.sh's self-delete is a PROMPT that
+# DEFAULTS TO NO. So a real seeded repo whose owner pressed Enter kept the
+# script and was silently validated in template mode — with the leftover-
+# placeholder check and the EXTENDS check both softened, on the one repo where
+# an unfilled placeholder is an actual defect. A softened check on a repo that
+# needs the strict one reports clean and means nothing.
+#
+# The second condition cannot survive seeding: init renames every placeholder-
+# named file unconditionally — no prompt — so a repo that has been through init
+# has no such file left, whatever it did with init-project.sh afterwards. Note
+# this MUST use the escaped tokens above: written plainly, the glob would be
+# substituted to this project's real extension and then match after init,
+# putting every seeded repo permanently in template mode.
 TEMPLATE_MODE=0
 if [ -f init-project.sh ]; then
-  TEMPLATE_MODE=1
+  if compgen -G "*.${_PH_AI}ai" >/dev/null 2>&1 || compgen -G "*.hey${_PH_HUMAN}" >/dev/null 2>&1; then
+    TEMPLATE_MODE=1
+  fi
 fi
 
 echo "Validating substrate in: $(pwd)"
-[ "$TEMPLATE_MODE" -eq 1 ] && echo "(template mode — init-project.sh detected)"
+[ "$TEMPLATE_MODE" -eq 1 ] && echo "(template mode — init-project.sh present AND substrate still placeholder-named)"
 
 # Resolve a substrate filename. The AI-file extension in this script is the
 # per-duo placeholder token (ADR-009) that init-project.sh expands at
@@ -196,13 +223,73 @@ else
   # Scan only git-tracked files so vendor dirs, generated caches, and
   # untracked local files don't produce false positives.
   leftover=$(git ls-files 2>/dev/null | xargs grep -lE '\{\{[A-Z_]+\}\}' 2>/dev/null || true)
+
+  # MENTION vs USE (2026-08-16). Matching a placeholder anywhere cannot tell an
+  # unfilled slot from prose that DESCRIBES the placeholder mechanism — and a
+  # repo built on this substrate WILL write that prose, in its journals, its
+  # ADRs and its handoffs. A gate whose one standing failure is known-bogus is a
+  # gate people learn to scroll past.
+  #
+  # The discriminator is the definition of the check, not a guess about
+  # sentence shape. This asks ONE question: "did init-project.sh finish?" That
+  # is only answerable about files init ever touched, i.e. files the TEMPLATE
+  # ships. A file with no counterpart in the template was authored by this
+  # project; init never saw it, so it cannot hold an unfilled placeholder.
+  #
+  # DEGRADES TOWARD OVER-DETECTION, NEVER UNDER. If the template is not
+  # reachable — the normal case for a repo seeded elsewhere — every hit stays a
+  # failure, exactly as before. A missing oracle must not quietly switch a gate
+  # off. Set TEMPLATE_REPO_PATH to point at your copy of the template if you
+  # keep one and want the distinction.
+  tmpl=""
+  _top=$(git rev-parse --show-toplevel 2>/dev/null)
+  for cand in "${TEMPLATE_REPO_PATH:-}" "${_top:+${_top}/../templateRepo_EXAMPLE}"; do
+    [ -n "$cand" ] && [ -d "$cand" ] && { tmpl="$cand"; break; }
+  done
+
+  inherited=""; authored=""
   if [ -n "$leftover" ]; then
-    count=$(echo "$leftover" | wc -l | tr -d ' ')
-    fail "$count file(s) contain unfilled {{TOKEN}} placeholders:"
-    echo "$leftover" | head -10 | sed 's/^/      /'
+    while IFS= read -r lf; do
+      [ -n "$lf" ] || continue
+      if [ -z "$tmpl" ]; then
+        inherited="${inherited}${lf}"$'\n'
+        continue
+      fi
+      # Path mapping: this repo's foo.<ai>ai is the template's placeholder-named
+      # counterpart. The LEFT side is written plainly so init substitutes it to
+      # this project's real extension; the RIGHT side uses the escaped tokens so
+      # it keeps naming the template's unfilled form. Both suffixes go through
+      # variables first — `${lf%.{{AI}}ai}` inline mis-parses, because bash
+      # closes the `${...}` at the first `}` inside the token (the same trap
+      # init-project.sh documents at its own rename loop).
+      ai_suffix='.{{AI}}ai'
+      human_suffix='.hey{{HUMAN}}'
+      case "$lf" in
+        *"$ai_suffix")    alt="${lf%$ai_suffix}.${_PH_AI}ai" ;;
+        *"$human_suffix") alt="${lf%$human_suffix}.hey${_PH_HUMAN}" ;;
+        *)                alt="$lf" ;;
+      esac
+      if [ -f "$tmpl/$lf" ] || [ -f "$tmpl/$alt" ]; then
+        inherited="${inherited}${lf}"$'\n'
+      else
+        authored="${authored}${lf}"$'\n'
+      fi
+    done <<< "$leftover"
+  fi
+
+  if [ -n "$inherited" ]; then
+    count=$(printf '%s' "$inherited" | grep -c . || true)
+    fail "$count file(s) inherited from the template still contain unfilled placeholders:"
+    printf '%s' "$inherited" | head -10 | sed 's/^/      /'
     [ "$count" -gt 10 ] && echo "      ... and $((count - 10)) more"
+    [ -z "$tmpl" ] && echo "      (template not reachable — every hit is reported, mention or use)"
   else
-    pass "No leftover {{TOKEN}} placeholders"
+    pass "No leftover placeholders in template-inherited files"
+  fi
+  if [ -n "$authored" ]; then
+    acount=$(printf '%s' "$authored" | grep -c . || true)
+    pass "$acount project-authored file(s) mention placeholder syntax (prose about the mechanism, not an unfilled slot)"
+    printf '%s' "$authored" | head -5 | sed 's/^/      /'
   fi
 fi
 
