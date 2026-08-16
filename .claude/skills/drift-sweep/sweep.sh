@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.27 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.28 — detect code/substrate drift in a repo.
+#
+# v0.1.28 (SESSION-093, 2026-08-16): `_bounded` polls instead of spawning a
+# sleeping killer. v0.1.27 shipped the obvious `( sleep N; kill $pid ) &` form,
+# which is correct but leaves the sleeper running for the rest of its N seconds
+# every time the probe finishes fast — i.e. on every normal boot, since this runs
+# from a SessionStart hook. A stray process per boot, still holding whatever
+# descriptors it inherited. Polling costs 1-second granularity nobody can
+# perceive and leaves nothing behind. Returns 124 on expiry, matching GNU
+# timeout's convention. Bumped rather than amended because v0.1.27 was already
+# pushed, and a version that means two different implementations is its own small
+# version of the drift this file spent the day fixing.
 #
 # v0.1.27 (SESSION-093, 2026-08-16): `_bounded` — the network guard that was
 # never actually there on this fleet's own machine.
@@ -739,19 +750,28 @@ is_declared_fork() {
 # there, a CHECK could not run and reported nothing; here a GUARD could not run,
 # and an absent guard has no output at all until something hangs.
 #
-# The fallback is a plain bash watchdog: run in background, kill on expiry. No
-# coreutils, no dependency, works everywhere bash does.
+# The fallback POLLS rather than spawning a sleeping killer. The obvious
+# `( sleep N; kill $pid ) &` watchdog works, but when the probe finishes fast —
+# the normal case — that sleeper LINGERS for the rest of its N seconds. In a
+# SessionStart hook that is a stray process left behind on every single boot,
+# still holding whatever descriptors it inherited. Polling costs a 1-second
+# granularity nobody here can perceive and leaves nothing running.
 _bounded() {
   local secs="$1"; shift
   if command -v timeout >/dev/null 2>&1; then timeout "$secs" "$@"; return $?; fi
   if command -v gtimeout >/dev/null 2>&1; then gtimeout "$secs" "$@"; return $?; fi
   "$@" &
-  local pid=$! rc=0
-  ( sleep "$secs"; kill -TERM "$pid" 2>/dev/null ) >/dev/null 2>&1 &
-  local wd=$!
-  wait "$pid" 2>/dev/null; rc=$?
-  kill -TERM "$wd" 2>/dev/null; wait "$wd" 2>/dev/null
-  return "$rc"
+  local pid=$! waited=0
+  while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt "$secs" ]; do
+    sleep 1; waited=$((waited + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -TERM "$pid" 2>/dev/null
+    wait "$pid" 2>/dev/null
+    return 124                      # same convention GNU timeout uses
+  fi
+  wait "$pid" 2>/dev/null
+  return $?
 }
 
 backstop_report() {

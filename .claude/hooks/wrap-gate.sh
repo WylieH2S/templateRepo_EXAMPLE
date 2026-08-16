@@ -132,20 +132,27 @@ if [ -f "$R/.github/workflows/${_bs_wf}" ]; then
     # fall back on. It stopped being theoretical when this exact line ran past two
     # minutes on the boot path and had to be killed by hand. Now a bash-native
     # watchdog: background the probe, kill it on expiry, no coreutils required.
-    _bs_pid=""; _bs_out="$(mktemp)"
+    # POLLING, not a `( sleep 20; kill ) &` watchdog. That form works, but on the
+    # normal fast path the sleeper LINGERS for the rest of its 20 seconds — a
+    # stray process left behind on every single boot, still holding whatever
+    # descriptors it inherited. Polling costs 1-second granularity and leaves
+    # nothing running.
+    _bs_out="$(mktemp)"
     bash "$_sweep" --backstop-only "$R" >"$_bs_out" 2>/dev/null &
-    _bs_pid=$!
-    ( sleep 20; kill -TERM "$_bs_pid" 2>/dev/null ) >/dev/null 2>&1 &
-    _bs_wd=$!
-    if wait "$_bs_pid" 2>/dev/null; then
-      backstop_lines=$(cat "$_bs_out")
+    _bs_pid=$!; _bs_waited=0
+    while kill -0 "$_bs_pid" 2>/dev/null && [ "$_bs_waited" -lt 20 ]; do
+      sleep 1; _bs_waited=$((_bs_waited + 1))
+    done
+    if kill -0 "$_bs_pid" 2>/dev/null; then
+      kill -TERM "$_bs_pid" 2>/dev/null; wait "$_bs_pid" 2>/dev/null
+      # A probe that did not complete is a THIRD state, neither green nor red.
+      # Printing nothing would make it look like green — the exact confusion this
+      # whole category exists to end.
+      backstop_lines="    backstop ${_bs_wf}: COULD NOT CHECK — probe exceeded its 20s bound (network? gh auth?)"
     else
-      # Killed or failed. Say so — a probe that did not complete is a THIRD state,
-      # neither green nor red, and printing nothing would make it look like green.
+      wait "$_bs_pid" 2>/dev/null
       backstop_lines=$(cat "$_bs_out")
-      [ -n "$backstop_lines" ] || backstop_lines="    backstop ${_bs_wf}: COULD NOT CHECK — probe exceeded its 20s bound or failed (network? gh auth?)"
     fi
-    kill -TERM "$_bs_wd" 2>/dev/null; wait "$_bs_wd" 2>/dev/null
     rm -f "$_bs_out"
   else
     # Loud, not silent. This whole category exists because absence of signal got read
