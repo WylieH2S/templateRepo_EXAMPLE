@@ -1,5 +1,25 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.25 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.26 — detect code/substrate drift in a repo.
+#
+# v0.1.26 (SESSION-093, 2026-08-16): NEW `doc-version` category — the fleet
+# gated code-vs-substrate drift and nothing gated code-vs-its-own-documentation.
+#
+# That gap has now cost the same thing twice. v0.1.19's own entry records the
+# first: "the banner on line 2 of sweep.sh ... had read v0.1.15 through four
+# releases, which is the same defect in miniature." The second was found hours
+# ago, one file over: SKILL.md read "v0.1.21 (current)" through four releases
+# while describing a one-token substitution rule (two since v0.1.24) and a plain
+# COPY as always-a-warn (fails in the template since v0.1.25). It surfaced only
+# because Wy asked whether anything else needed adjusting.
+#
+# A stale doc is worse than no doc. An agent reads SKILL.md to learn what the
+# gate does, and a confidently wrong answer gets acted on.
+#
+# Checks ONLY version strings that claim currency — a `(current)` marker or one
+# in a section heading. A changelog of historical entries is the doc working
+# correctly and is never flagged; that false positive is what would make the
+# category ignorable. Verified against the real historical state (the actual
+# stale SKILL.md and the actual sweep.sh at 7b195a0), not a synthetic one.
 #
 # v0.1.25 (SESSION-093, 2026-08-16): the ladder REQUIRES template form in the
 # template, and wrap-continuity stops asking the template a question it has no
@@ -2140,6 +2160,93 @@ else
     elif [ "$sk_bad" -eq 0 ]; then
       pass "skill-canonical: ${sk_checked} skill(s) reconciled (${sk_fork} declared fork(s))"
     fi
+  fi
+fi
+
+# ── 16. Skill doc version consistency (v0.1.26) ───────────────
+# The fleet gates code-vs-substrate drift and had NOTHING gating
+# code-vs-its-own-documentation. Twice now that has cost the same thing:
+#
+#   v0.1.19 — "The banner on line 2 of sweep.sh was also corrected; it had read
+#             v0.1.15 through four releases, which is the same defect in
+#             miniature."
+#   2026-08-16 — SKILL.md read "v0.1.21 (current)" through four releases, while
+#             documenting a one-token substitution rule (two since v0.1.24) and
+#             a plain COPY as always-a-warn (fails in the template since
+#             v0.1.25). Found only because someone asked "anything else?"
+#
+# A stale doc is worse than no doc: an agent reads SKILL.md to learn what the
+# gate does, and a confidently wrong answer is acted on.
+#
+# WHAT IT COMPARES, AND WHAT IT DELIBERATELY DOES NOT. Only version strings
+# that CLAIM CURRENCY are checked — a `(current)` marker, or one in a section
+# heading. A changelog full of historical `- **v0.1.20** — …` entries is the
+# doc working correctly and must never be flagged; that is precisely the
+# false-positive that would get this category ignored. No currency claim
+# anywhere → graceful pass: the doc is not asserting a version, so there is
+# nothing to be wrong about.
+#
+# Symlinked skill dirs are skipped — those are the workspace canonical seen
+# from a consuming repo, and checking the same two files eleven times to say
+# the same thing eleven times is how a report becomes wallpaper. They are
+# checked in the repo that physically holds them.
+#
+# soft_fail: WARN by default, FAIL via --fail-on=doc-version. Advisory-first,
+# the same rollout every other soft_fail category here got.
+CURRENT_CATEGORY="doc-version"
+section "Skill doc version consistency"
+if [ ! -d .claude/skills ]; then
+  pass "doc-version: no .claude/skills — skipping"
+else
+  dv_checked=0; dv_bad=0
+  for sd in .claude/skills/*; do
+    [ -d "$sd" ] || continue
+    [ -L "$sd" ] && continue
+    doc="$sd/SKILL.md"
+    [ -f "$doc" ] || continue
+
+    # The script's own banner: first `vX.Y[.Z]` in a comment in the first 5 lines.
+    code_ver=""; code_file=""
+    for _s in "$sd"/*.sh; do
+      [ -f "$_s" ] || continue
+      _v=$(head -5 "$_s" | sed -n 's/^#.*[[:space:]]\(v[0-9][0-9.]*\).*/\1/p' | head -1)
+      [ -n "$_v" ] && { code_ver="$_v"; code_file="$_s"; break; }
+    done
+    [ -n "$code_ver" ] || continue          # no banner to compare against
+
+    # Currency claims in the doc: `(vX)` in a heading, or a changelog entry
+    # whose line BEGINS `- **vX (current)**`.
+    #
+    # BOTH PATTERNS ARE LINE-ANCHORED, and that is not incidental. The first
+    # version of this used an unanchored `(current)` alternative, and its very
+    # first real run flagged this file — because the entry documenting the
+    # v0.1.21 defect *quotes the string* `v0.1.21 (current)` while narrating it.
+    # Prose that DESCRIBES a stale claim is not making one. That is the identical
+    # mention-vs-use defect fixed in validate-substrate hours earlier the same
+    # day, rebuilt from scratch in a different check by the same hands, which is
+    # a fair measure of how natural the mistake is. A claim occupies the start of
+    # its line; a mention sits inside a sentence.
+    claims=$( { grep -oE '^#+[[:space:]][^(]*\(v[0-9][0-9.]*\)' "$doc";
+                grep -oE '^([-*][[:space:]]+)?\*{0,2}v[0-9][0-9.]*[[:space:]]*\(current\)' "$doc"; } \
+              | grep -oE 'v[0-9][0-9.]*' | sort -u)
+    [ -n "$claims" ] || continue            # doc asserts no version — nothing to check
+
+    dv_checked=$((dv_checked+1))
+    stale=""
+    while IFS= read -r c; do
+      [ -n "$c" ] || continue
+      [ "$c" = "$code_ver" ] || stale="${stale} ${c}"
+    done <<< "$claims"
+
+    if [ -n "$stale" ]; then
+      soft_fail "doc-version: $(basename "$sd")/SKILL.md claims${stale} as current, but $(basename "$code_file") is ${code_ver} — the doc is describing a release the code has moved past"
+      dv_bad=$((dv_bad+1))
+    fi
+  done
+  if [ "$dv_checked" -eq 0 ]; then
+    pass "doc-version: no skill here pairs a versioned script with a version-claiming SKILL.md"
+  elif [ "$dv_bad" -eq 0 ]; then
+    pass "doc-version: ${dv_checked} skill doc(s) match their script's version"
   fi
 fi
 
