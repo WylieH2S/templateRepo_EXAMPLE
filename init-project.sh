@@ -194,8 +194,32 @@ done < <(
     ! -path "./.git/*" \
     ! -path "./stacks/*" \
     ! -path "./workspace/*" \
+    ! -path "./.claude/skills/*" \
+    ! -path "./.claude/hooks/*" \
     -print0
 )
+
+# WHY .claude/skills AND .claude/hooks ARE EXCLUDED (2026-08-16).
+#
+# Those are fleet TOOLING carried verbatim from the workspace canonical, not
+# template CONTENT. They are already correct for any duo, because they resolve
+# the carrier extension at runtime rather than hardcoding one. Substituting
+# tokens into them does not adapt them — it breaks them, in two ways that both
+# fail silently:
+#
+#   drift-sweep's template discriminator reads
+#       [ -f init-project.sh ] && [ "$AI_EXT" = '{{AI}}ai' ]
+#   Rewriting that literal to '<ai>ai' makes the test TRUE for a seeded repo
+#   that kept init-project.sh — and template mode SOFTENS checks. A relaxed gate
+#   on a repo that needs the strict one reports clean and means nothing.
+#
+#   template_form()'s rule, `gsub(/chloeai/, "{{AI}}ai")`, would become
+#   `gsub(/<ai>ai/, "<ai>ai")` — a no-op that disables the rule while still
+#   looking like it is enforcing it.
+#
+# Both are the mention-vs-use distinction: a `{{AI}}` inside a substitution rule
+# is the rule's SUBJECT, not a slot to fill. The scripts state the rule; they are
+# not instances of it. Nothing under these two paths should ever be rewritten.
 
 echo "Substituting placeholders across ${#FILES[@]} files..."
 
@@ -294,6 +318,20 @@ echo "Next steps:"
 echo "  1. Fill in version pins and build commands in .claude/rules/code.${AI}ai"
 echo "  2. Fill in ai_context/project_brief.md and ai_context/CURRENT_MISSION.md"
 echo "  3. Confirm ai_modules/hi_mode.${AI}ai EXTENDS path resolves (defaults to ~/.claude/skills/hi-mode/SKILL.md)"
+# CHECKED, not merely mentioned. On a machine that has never hosted one of these
+# projects the central charter is absent, and its absence is the ONLY failure a
+# correctly-seeded repo reports. Leaving that to be discovered by running the
+# validator makes the first experience of the template a red X with no stated
+# cause. The charter ships in this repo, so the fix is one copy — say so, with
+# the exact command, and only when it is actually missing.
+if [ ! -f "${HOME}/.claude/skills/hi-mode/SKILL.md" ]; then
+  echo
+  echo "     ⚠ That charter is NOT on this machine yet, and it is the one thing"
+  echo "       standing between you and a clean validate. It ships in this repo:"
+  echo "         mkdir -p ~/.claude/skills/hi-mode"
+  echo "         cp workspace/.claude/skills/hi-mode/SKILL.md ~/.claude/skills/hi-mode/SKILL.md"
+  echo "       Without it the shim inherits nothing — no stop-the-line, no git safety."
+fi
 echo "  4. Run: bash .claude/skills/validate-substrate/validate.sh  (should pass with 0 failures)"
 echo "  5. git init && git add . && git commit -m 'bootstrap: ${PROJECT_NAME} from templateRepo_EXAMPLE'"
 echo "  (pre-commit guards: lefthook was activated above if installed, otherwise run 'brew install lefthook && lefthook install')"
