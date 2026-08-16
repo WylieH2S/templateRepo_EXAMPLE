@@ -10,7 +10,7 @@ Validates a repo against the two-tier load model conventions defined in template
 ## What it checks
 
 ### Template mode detection
-The script detects "template mode" by the presence of `init-project.sh`. In template mode, three accommodations apply because they describe state that only becomes valid post-bootstrap: leftover `{{TOKEN}}` placeholders are skipped entirely, an unresolved `EXTENDS` path downgrades from FAIL to WARN, and substrate filenames match either way because the script's own filename references are the same per-duo placeholder tokens (ADR-009) that `init-project.sh` expands — in template mode the files on disk literally carry the token names, and post-init both the files and this script are substituted in the same pass. That is what lets the template itself validate 0-fails and serve as the boot-contract conformance oracle.
+The script detects "template mode" by **two** conditions: `init-project.sh` is present **and** the substrate is still placeholder-named. One condition is not enough, and used to be: `init-project.sh`'s self-delete is a **prompt that defaults to NO**, so a real seeded repo whose owner pressed Enter kept the script and was silently validated in template mode — with the leftover-placeholder check skipped and the `EXTENDS` check softened, on the one repo where an unfilled placeholder is an actual defect, printing ✓ throughout. The second condition cannot survive seeding: init renames those files unconditionally, no prompt. (The two placeholder literals used by that test are assembled from pieces in the script so init's own substitution pass cannot rewrite them.) In template mode, three accommodations apply because they describe state that only becomes valid post-bootstrap: leftover `{{TOKEN}}` placeholders are skipped entirely, an unresolved `EXTENDS` path downgrades from FAIL to WARN, and substrate filenames match either way because the script's own filename references are the same per-duo placeholder tokens (ADR-009) that `init-project.sh` expands — in template mode the files on disk literally carry the token names, and post-init both the files and this script are substituted in the same pass. That is what lets the template itself validate 0-fails and serve as the boot-contract conformance oracle.
 
 ### Tier 1 (always-loaded) files — must exist:
 - `CLAUDE.md` — path-routing table
@@ -54,7 +54,9 @@ Per `.repo-manager/standards/boot-contract/BOOT-CONTRACT.{{AI}}ai`. R1 (the `STA
 - No tracked `*.local.json` files
 
 ### Leftover placeholder tokens:
-- No `{{TOKEN}}` placeholders left unfilled (skipped in template mode)
+- No `{{TOKEN}}` placeholders left unfilled **in files the template ships** (skipped entirely in template mode)
+- **Mention vs use.** Matching a placeholder anywhere cannot tell an unfilled slot from prose that *describes* the placeholder mechanism — and a project built on this substrate will write that prose, in its journals, its ADRs and its handoffs. A gate whose one standing failure is known-bogus is a gate people learn to scroll past. The discriminator is the definition of the check rather than a guess about sentence shape: this asks *"did `init-project.sh` finish?"*, which is only answerable about files init ever touched — i.e. files the template ships. A file with no counterpart in the template was authored by this project; init never saw it, so it cannot be carrying an unfilled placeholder.
+- **Degrades toward over-detection, never under.** If the template is not reachable — the normal case for a repo seeded elsewhere — every hit stays a failure, exactly as before. A missing oracle must not quietly switch a gate off. Set `TEMPLATE_REPO_PATH` if you keep a copy of the template beside your repo and want the distinction.
 
 ### Freshness checks (90-day threshold):
 - `ai_context/current_state.md` modified within 90 days
