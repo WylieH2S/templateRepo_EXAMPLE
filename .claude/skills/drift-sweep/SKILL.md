@@ -43,7 +43,7 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracke
 bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-journals | jq '.exit_failures'
 ```
 
-## Checks (v0.1.33)
+## Checks (v0.1.34)
 
 1. **Working-tree health** — total uncommitted insertions+deletions (FAIL if > `DIFF_FAIL_THRESHOLD`, default 1000); dirty file count (WARN if > `DIRTY_FILES_WARN`, default 10); count of `+// vX.Y.Z` comment lines added in a single file's diff (FAIL if > `JOURNAL_DIFF_LINES_FAIL`, default 3).  **Gate:** `working-tree`
 2. **Untracked important docs** — any file under `git ls-files --others --exclude-standard` whose name contains `audit`/`findings`/`mission`/`handoff`/`decisions`/`charter`/`rules` and ends in `.md` or `.chloeai`. These should never be untracked.  **Gate:** `untracked-docs`
@@ -72,7 +72,7 @@ quietly commit fleet-wide substrate to a feature branch where nobody will find i
 
 19. **The report-only WISL family** — five checks that measure rather than judge: `ownership-coverage`
 (waystones whose `owns` globs match nothing), `boot-source-size` (declared boot sources too large to
-arrive within their packet ceiling), `validation-age` and `validation-liveness` (whether a card's
+arrive within the packet ceiling **BOOT-CONTRACT R5** defines), `validation-age` and `validation-liveness` (whether a card's
 `validation:` command is stale or no longer runs), and `continuity-age` (how long since a card's
 `continuity:` was rewritten). They print findings and never fail.
   **Gate:** `ownership-coverage`, `boot-source-size`, `validation-age`, `validation-liveness`, `continuity-age`
@@ -190,7 +190,15 @@ Exit code: 0 if no failures, 1 if any FAIL, 2 if cannot enter target repo.
 
 ## Versions
 
-- **v0.1.33 (current)** — **New `doc-coverage` category, and the doc it forced.** `doc-version` (v0.1.26) compares the version a `SKILL.md` *claims* against the version its script declares. That catches a **stale** doc and is structurally blind to an **absent** one. Measured 2026-08-16: this doc numbered **16 checks while the code ran 24 categories**, and **20 of those 24 never named their `--fail-on` handle anywhere** — including `waystone-validity`, a hard-FAIL category that owns the heywy doorway test. A gate you cannot name is a gate you cannot arm, so the most actionable fact about each check was the one the doc omitted.
+- **v0.1.34 (current)** — **The boot packet budget moves into the standard that should have owned it.** `bs_cap=$((16384 / bs_files))` was an arithmetic expression inside `boot-source-size`, and the number appeared in **no standard anywhere** — `BOOT-CONTRACT.chloeai` is 9 KB of normative rules and defined no ceiling at all. The gate was enforcing a budget the fleet could not read, disagree with, or change without opening the implementation. A constant with no owner is a magic number.
+
+  `BOOT-CONTRACT` **R5** now states `BOOT_PACKET_BUDGET_CHARS = 16384`, `BOOT_PACKET_SLOTS_INDEX = 8`, `BOOT_PACKET_SLOTS_SEAM = 4`, with the per-entry ceiling derived as `budget / slots` — 2048 chars for an index card, 4096 for a code seam. `sweep.sh` parses those through a new `standard_file()` helper that resolves fleet standards the same way `canonical_dir()` resolves canonical skills.
+
+  **There is no built-in fallback, deliberately.** An unreadable or malformed standard makes the category report `COULD NOT CHECK` and evaluate nothing. Defaulting to a hardcoded 16384 would rebuild the exact defect being removed, and would go on printing confident deliverability percentages derived from a number nobody could see — the silent-pass class wearing a different hat.
+
+  Verified three ways: halving the budget in the standard halved every reported cap, proving the gate follows the standard rather than coincidentally agreeing with it; removing the standard produced `COULD NOT CHECK`; corrupting only the budget line produced `COULD NOT CHECK` naming the file. The standard was restored byte-identical after each.
+
+- **v0.1.33** — **New `doc-coverage` category, and the doc it forced.** `doc-version` (v0.1.26) compares the version a `SKILL.md` *claims* against the version its script declares. That catches a **stale** doc and is structurally blind to an **absent** one. Measured 2026-08-16: this doc numbered **16 checks while the code ran 24 categories**, and **20 of those 24 never named their `--fail-on` handle anywhere** — including `waystone-validity`, a hard-FAIL category that owns the heywy doorway test. A gate you cannot name is a gate you cannot arm, so the most actionable fact about each check was the one the doc omitted.
 
   The rule is deliberately **not** one-numbered-check-per-category. Some checks honestly own several — WISL validity and freshness are one story — so requiring 1:1 would force fake structure. It requires only that every category name appears in backticks somewhere in the doc, which is exactly the property that makes `--fail-on` discoverable.
 

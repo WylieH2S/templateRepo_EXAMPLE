@@ -1,5 +1,20 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.33 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.34 — detect code/substrate drift in a repo.
+#
+# v0.1.34 (SESSION-095, 2026-08-16): the boot packet budget moves OUT of this
+# script and into the standard that should always have owned it. `16384 / 4` was
+# an arithmetic expression in boot-source-size and appeared in no standard
+# anywhere — the gate enforced a number the fleet could not read, argue with, or
+# change without opening the implementation. BOOT-CONTRACT R5 states it now
+# (BOOT_PACKET_BUDGET_CHARS / SLOTS_INDEX / SLOTS_SEAM) and the gate parses it.
+#
+# A constant with no owner is a magic number. Verified by halving the budget in
+# the standard and watching every cap halve.
+#
+# Unreadable or malformed standard => COULD NOT CHECK, evaluating nothing. There
+# is deliberately NO built-in fallback: defaulting to 16384 would rebuild the
+# exact defect being removed and would keep printing confident percentages
+# derived from a number nobody could see.
 #
 # v0.1.33 (SESSION-095, 2026-08-16): new `doc-coverage` category. doc-version
 # compares the version a SKILL.md CLAIMS against its script's banner — that
@@ -888,6 +903,21 @@ canonical_dir() {
   top=$(git rev-parse --show-toplevel 2>/dev/null || true)
   for cand in "${top:+${top}/../.claude/${kind}}" "${HOME}/GitHub/.claude/${kind}"; do
     [ -n "$cand" ] && [ -d "$cand" ] && { printf '%s' "$cand"; return 0; }
+  done
+  return 1
+}
+
+# standard_file <relative-path-under-standards> — locate a fleet standard, using the
+# same workspace resolution as canonical_dir. Returns 1 when unreachable, which is a
+# normal condition (a repo cloned outside the fleet, a single-repo CI checkout) and
+# must be reported, never papered over with a built-in default.
+standard_file() {
+  local rel="$1" top cand
+  top=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  for cand in "${top:+${top}/../.repo-manager/standards/${rel}}" \
+              "${top:+${top}/.repo-manager/standards/${rel}}" \
+              "${HOME}/GitHub/.repo-manager/standards/${rel}"; do
+    [ -n "$cand" ] && [ -f "$cand" ] && { printf '%s' "$cand"; return 0; }
   done
   return 1
 }
@@ -1977,7 +2007,25 @@ fi
 # each actually lands.
 CURRENT_CATEGORY="boot-source-size"
 section "Boot-source deliverability (report-only)"
-if [ ! -d .git ]; then
+# THE BUDGET IS THE STANDARD'S, NOT THIS SCRIPT'S (2026-08-16). `16384 / 4` used to
+# be an arithmetic expression right here and appeared in no standard anywhere, so
+# the gate enforced a number the fleet could not read, argue with, or change
+# without opening the implementation. BOOT-CONTRACT R5 owns it now.
+#
+# Unreadable standard => the category says COULD NOT CHECK and evaluates nothing.
+# It does NOT fall back to a built-in 16384: a silent default would rebuild exactly
+# the defect this change removes, and would keep reporting confident percentages
+# derived from a number nobody could see.
+BS_STD=$(standard_file "boot-contract/BOOT-CONTRACT.${AI_EXT}" 2>/dev/null || true)
+BS_BUDGET=""; BS_SLOTS_INDEX=""; BS_SLOTS_SEAM=""
+if [ -n "$BS_STD" ]; then
+  BS_BUDGET=$(grep -oE 'BOOT_PACKET_BUDGET_CHARS[[:space:]]*=[[:space:]]*[0-9]+' "$BS_STD" | grep -oE '[0-9]+$' | head -1)
+  BS_SLOTS_INDEX=$(grep -oE 'BOOT_PACKET_SLOTS_INDEX[[:space:]]*=[[:space:]]*[0-9]+' "$BS_STD" | grep -oE '[0-9]+$' | head -1)
+  BS_SLOTS_SEAM=$(grep -oE 'BOOT_PACKET_SLOTS_SEAM[[:space:]]*=[[:space:]]*[0-9]+' "$BS_STD" | grep -oE '[0-9]+$' | head -1)
+fi
+if [ -z "$BS_BUDGET" ] || [ -z "$BS_SLOTS_INDEX" ] || [ -z "$BS_SLOTS_SEAM" ] || [ "$BS_SLOTS_INDEX" -eq 0 ] || [ "$BS_SLOTS_SEAM" -eq 0 ]; then
+  pass "boot-source-size: COULD NOT CHECK — BOOT-CONTRACT R5 packet ceilings unreadable${BS_STD:+ at $BS_STD} (no built-in fallback, by design)"
+elif [ ! -d .git ]; then
   pass "boot-source-size: not a git repo — skipping"
 else
   bs_flagged=0
@@ -1991,8 +2039,8 @@ else
     # slots (breadth); anything else is a code seam and gets 4 (depth).
     bs_total=$(printf '%s\n' "$bs_entries" | grep -c .)
     bs_stones=$(printf '%s\n' "$bs_entries" | grep -cE "_waystone\.${AI_EXT_RE}$" || true)
-    if [ "$bs_total" -eq "$bs_stones" ]; then bs_files=8; else bs_files=4; fi
-    bs_cap=$((16384 / bs_files))
+    if [ "$bs_total" -eq "$bs_stones" ]; then bs_files="$BS_SLOTS_INDEX"; else bs_files="$BS_SLOTS_SEAM"; fi
+    bs_cap=$((BS_BUDGET / bs_files))
     bs_dir=$(dirname "$wf")
     while IFS= read -r e; do
       [ -z "$e" ] && continue
