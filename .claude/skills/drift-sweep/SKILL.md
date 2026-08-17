@@ -43,7 +43,7 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracke
 bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-journals | jq '.exit_failures'
 ```
 
-## Checks (v0.1.30)
+## Checks (v0.1.31)
 
 1. **Working-tree health** — total uncommitted insertions+deletions (FAIL if > `DIFF_FAIL_THRESHOLD`, default 1000); dirty file count (WARN if > `DIRTY_FILES_WARN`, default 10); count of `+// vX.Y.Z` comment lines added in a single file's diff (FAIL if > `JOURNAL_DIFF_LINES_FAIL`, default 3).
 2. **Untracked important docs** — any file under `git ls-files --others --exclude-standard` whose name contains `audit`/`findings`/`mission`/`handoff`/`decisions`/`charter`/`rules` and ends in `.md` or `.chloeai`. These should never be untracked.
@@ -161,7 +161,17 @@ Exit code: 0 if no failures, 1 if any FAIL, 2 if cannot enter target repo.
 
 ## Versions
 
-- **v0.1.30 (current)** — **The template holds real copies again — a correction to v0.1.29, not a reversal of it.** v0.1.29 symlinked `templateRepo_EXAMPLE`'s skills and hooks to the workspace canonical. That is right for the ten *consuming* repos and wrong for the template, whose README opens with *"Use this template → Create a new repository, then clone it locally"*: it is built to leave this machine, and a relative symlink into `~/GitHub` dangles the instant it does. Verified against a real clone — four dangling links, both gates `rc=127`.
+- **v0.1.31 (current)** — **`tier1-bloat` gains the aggregate budget, and "Tier 1" finally means one thing.** The charter's LOAD ECONOMICS claimed *"≤200 lines total across all Tier 1 files"*; the only mechanism was a **per-file** 25 KB check, so every repo in the fleet ran **313–796 lines** and every one of them passed. A budget with no mechanism is decoration.
+
+  Fixing it required fixing something underneath first: **three definitions of Tier 1 existed and none matched** — the charter listed one set, `templateRepo_EXAMPLE/CLAUDE.md` a second, `TIER1_FILES` a third. An aggregate over a set nobody agrees on measures nothing. All three are now the **union**, and the consequential addition is **`STARTUP_AI`** — the boot capsule `BOOT-CONTRACT` R1 makes mandatory, the most reliably always-loaded file in any repo, and it was in *none* of the three lists. The single heaviest boot cost in the fleet was exempt from the check whose whole purpose is measuring boot cost.
+
+  Budget is **750 lines**, calibrated from the measured distribution rather than aspiration (Planitaria 796, planTheBeast 749, TFNerd 591, PocketLink 588, OperationFarmstock 557, r1Intern 495, ADTNode 489, HomeImprovement 467, Task-Force-Nerd-LLC 456, MechaComet 399). That makes exactly one repo a real failure and turns the gate into a ratchet against creep for the rest. `soft_fail` — WARN by default, FAIL via `--fail-on=tier1-bloat` — because arming a brand-new threshold straight to FAIL would break Planitaria's next pre-commit over a budget invented that morning. The per-file 25 KB check is unchanged and stays advisory.
+
+  **If this number is ever raised to make a failure go away, that is the defect and not the fix.** Page the content to Tier 2 instead.
+
+  Verified: output byte-identical old-vs-new across all 11 repos except Planitaria gaining exactly the intended warning; `--fail-on=tier1-bloat` exits 1 there and 0 in a repo under budget.
+
+- **v0.1.30** — **The template holds real copies again — a correction to v0.1.29, not a reversal of it.** v0.1.29 symlinked `templateRepo_EXAMPLE`'s skills and hooks to the workspace canonical. That is right for the ten *consuming* repos and wrong for the template, whose README opens with *"Use this template → Create a new repository, then clone it locally"*: it is built to leave this machine, and a relative symlink into `~/GitHub` dangles the instant it does. Verified against a real clone — four dangling links, both gates `rc=127`.
 
   The template can hold **plain** copies safely now, which it never could before, because the scripts resolve the carrier at runtime. What made the old copies corrupt was the **substitution**, not the copying. So: byte-identical copies, no substitution, and `init-project.sh` now excludes `.claude/skills/` and `.claude/hooks/` from token rewriting — without that it would rewrite the `'{{AI}}ai'` literal in the `IS_TEMPLATE` discriminator (making template mode, which *softens* checks, fire on seeded repos) and no-op `template_form()`'s own rule.
 

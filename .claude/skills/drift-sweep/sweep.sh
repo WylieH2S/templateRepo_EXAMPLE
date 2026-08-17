@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.30 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.31 — detect code/substrate drift in a repo.
+#
+# v0.1.31 (SESSION-095, 2026-08-16): tier1-bloat gains the AGGREGATE budget the
+# charter always stated and nothing ever checked, and the definition of "Tier 1"
+# is reconciled to one set.
+#
+# Three definitions existed and none matched — the HI Mode charter listed one
+# set, templateRepo's CLAUDE.md a second, TIER1_FILES a third. A budget over a
+# set nobody agrees on measures nothing, and the evidence is that LOAD ECONOMICS
+# claimed "<=200 lines total" while every repo in the fleet ran 313-796 and every
+# one of them passed. The only mechanism was a per-FILE 25 KB check.
+#
+# The three are now the UNION, and the consequential addition is STARTUP_AI: the
+# boot capsule BOOT-CONTRACT R1 makes mandatory, the most reliably always-loaded
+# file in any repo, and absent from all three lists. The heaviest boot cost in
+# the fleet was exempt from the check that exists to measure boot cost.
+#
+# Budget 750, calibrated from the measured distribution rather than aspiration,
+# so exactly one repo (Planitaria, 796) has work to do and the gate is a ratchet
+# for everyone else. soft_fail: WARN by default, FAIL via --fail-on=tier1-bloat.
 #
 # v0.1.30 (SESSION-094, 2026-08-16): the template holds REAL COPIES again, and
 # that is a correction of v0.1.29, not a reversal of it.
@@ -468,7 +487,8 @@
 #   BACKSTOP_CHECK            — set 0 to skip the one network probe entirely (default 1)
 #   SOURCE_EXTENSIONS         — file extensions to treat as source (default "ts tsx js py rs go swift")
 #   TIER1_FILES               — space-separated always-loaded substrate files to size-check
-#   TIER1_BLOAT_WARN_KB       — always-loaded file size WARN threshold in KB (default 25)
+#   TIER1_BLOAT_WARN_KB       — always-loaded PER-FILE size WARN threshold in KB (default 25)
+#   TIER1_AGGREGATE_WARN_LINES — always-loaded TOTAL line budget (default 750, soft_fail)
 #   WRAP_CARRIER              — wrap-continuity carrier override (default: auto-detect
 #                               readme_AI.chloeai, else the workspace HANDOFF log)
 #   WRAP_LAG_WARN             — commits the carrier may lag HEAD before wrap-continuity
@@ -613,6 +633,7 @@ BACKSTOP_STALE_DAYS="${BACKSTOP_STALE_DAYS:-2}"
 BACKSTOP_CHECK="${BACKSTOP_CHECK:-1}"
 SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
 TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
+TIER1_AGGREGATE_WARN_LINES="${TIER1_AGGREGATE_WARN_LINES:-750}"
 WRAP_CARRIER="${WRAP_CARRIER:-}"
 WRAP_LAG_WARN="${WRAP_LAG_WARN:-10}"
 
@@ -728,7 +749,17 @@ HUMAN_EXT_RE=$(_ere_escape "$HUMAN_EXT")
 # it is MOVED rather than parameterised in place, because ${AI_EXT} is still the
 # empty string that early — the tier1-bloat check would have sized a file named
 # `readme_AI.`, found nothing, and passed.
-TIER1_FILES="${TIER1_FILES:-readme_AI.${AI_EXT} CLAUDE.md ai_context/ai_rules.${AI_EXT} ai_context/glossary.${AI_EXT} ai_context/CURRENT_MISSION.md ai_context/START_HERE.md}"
+# THE SET IS THE UNION, AND THAT IS A DECISION (2026-08-16). Three definitions of
+# "Tier 1" existed and none of them matched: the HI Mode charter listed one set,
+# templateRepo's CLAUDE.md a second, and this variable a third. An aggregate
+# budget over a set nobody agrees on measures nothing, so the three were
+# reconciled to the UNION and the two docs updated to match this line.
+#
+# STARTUP_AI is the consequential addition. It is the boot capsule BOOT-CONTRACT
+# R1 makes mandatory — the most reliably always-loaded file in any repo — and it
+# was in NEITHER the charter's list nor this one. The single heaviest boot cost
+# in the fleet was exempt from the bloat check that exists to measure boot cost.
+TIER1_FILES="${TIER1_FILES:-STARTUP_AI.${AI_EXT} readme_AI.${AI_EXT} CLAUDE.md ai_context/ai_rules.${AI_EXT} ai_context/glossary.${AI_EXT} ai_context/CURRENT_MISSION.md ai_context/START_HERE.md}"
 # Guard the escaper's OWN output. A resolved-but-unescapable suffix would sail
 # straight past the check above and land as an empty pattern.
 if [ -z "$AI_EXT_RE" ]; then
@@ -1486,9 +1517,13 @@ fi
 CURRENT_CATEGORY="tier1-bloat"
 section "Always-loaded substrate bloat"
 tier1_bloat_hits=0
+tier1_total_lines=0
+tier1_present=0
 warn_bytes=$((TIER1_BLOAT_WARN_KB * 1024))
 for sub in $TIER1_FILES; do
   [ -f "$sub" ] || continue
+  tier1_present=$((tier1_present+1))
+  tier1_total_lines=$((tier1_total_lines + $(wc -l < "$sub" 2>/dev/null | tr -d ' ')))
   sz=$(wc -c < "$sub" 2>/dev/null | tr -d ' ')
   if [ "$sz" -gt "$warn_bytes" ]; then
     warn "tier1 bloat: ${sub} is $((sz / 1024)) KB (>${TIER1_BLOAT_WARN_KB} KB) — page history out to an on-demand archive (ADR-004)"
@@ -1496,6 +1531,31 @@ for sub in $TIER1_FILES; do
   fi
 done
 [ "$tier1_bloat_hits" -eq 0 ] && pass "no always-loaded substrate files over ${TIER1_BLOAT_WARN_KB} KB"
+
+# THE AGGREGATE, which is the number the charter always stated and NOTHING ever
+# checked. LOAD ECONOMICS said "<=200 lines total across all Tier 1 files"; the
+# only mechanism was the per-file KB check above, so six repos ran at 313-796
+# lines and every one of them passed. A budget with no mechanism is a wish, and
+# this fleet has now paid for that lesson often enough to stop writing them.
+#
+# 750 is calibrated from measured reality rather than aspiration (union set,
+# 2026-08-16: Planitaria 796, planTheBeast 749, TFNerd 591, PocketLink 588,
+# OperationFarmstock 557, r1Intern 495, ADTNode 489, HomeImprovement 467,
+# Task-Force-Nerd-LLC 456, MechaComet 399). It makes Planitaria the one repo with
+# real work to do and turns the gate into a ratchet against future creep for
+# everyone else.
+#
+# soft_fail, not fail: WARN by default, FAIL via --fail-on=tier1-bloat. Arming
+# straight to FAIL would break Planitaria's next pre-commit on a repo whose only
+# offence is being slightly over a budget invented today. Advisory-first is this
+# fleet's documented rollout and it is not negotiable for a brand-new threshold.
+if [ "$tier1_present" -gt 0 ]; then
+  if [ "$tier1_total_lines" -gt "$TIER1_AGGREGATE_WARN_LINES" ]; then
+    soft_fail "tier1 aggregate: ${tier1_total_lines} lines across ${tier1_present} always-loaded file(s), over the ${TIER1_AGGREGATE_WARN_LINES}-line budget — page reference material to an on-demand Tier 2 file (ADR-004)"
+  else
+    pass "tier1 aggregate: ${tier1_total_lines} lines across ${tier1_present} always-loaded file(s), within the ${TIER1_AGGREGATE_WARN_LINES}-line budget"
+  fi
+fi
 
 # ── 9. WISL waystone VALIDITY (v0.1.11) ───────────────────────
 # Can the runtime actually READ this card? Every other WISL category — freshness,

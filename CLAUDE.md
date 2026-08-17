@@ -4,7 +4,9 @@ AI bootstrap: read `STARTUP_AI.{{AI}}ai` before any analysis or execution. START
 
 ## Always-Loaded (Tier 1)
 
-Budget target: ≤ 200 lines total across all Tier 1 files. Audit periodically to catch creep — drift here directly degrades every session's boot quality.
+Budget: **≤ 750 lines total** across all Tier 1 files, enforced by drift-sweep's `tier1-bloat` category (`soft_fail` — WARN by default, FAIL via `--fail-on=tier1-bloat`). Drift here directly degrades every session's boot quality.
+
+> The set below is authoritative and must stay identical to the HI Mode charter's LOAD ECONOMICS list and drift-sweep's `TIER1_FILES`. Those three disagreed until 2026-08-16, which is why the old ≤200 budget went unmet by every repo and unnoticed by everything. Do not add a file here without adding it to the other two.
 
 **Last audited:** {{TODAY}}
 
@@ -12,12 +14,16 @@ Budget target: ≤ 200 lines total across all Tier 1 files. Audit periodically t
 |------|---------|-----------------|
 | `STARTUP_AI.{{AI}}ai` | Boot file (READ_ORDER + operating rules) | — |
 | `readme_AI.{{AI}}ai` | Active threads + latest handoff | — |
+| `CLAUDE.md` | This file — path-to-rule routing table | — |
 | `ai_context/ai_rules.{{AI}}ai` | Project-wide hard constraints | — |
 | `ai_context/glossary.{{AI}}ai` | File-type conventions and terminology | — |
+| `ai_context/CURRENT_MISSION.md` | Active priority, scope, stop conditions | — |
 | `ai_context/START_HERE.md` | File map and conventions reference | — |
 
 > Populate the line counts after first real session via:
-> `for f in STARTUP_AI.{{AI}}ai readme_AI.{{AI}}ai ai_context/ai_rules.{{AI}}ai ai_context/glossary.{{AI}}ai ai_context/START_HERE.md; do wc -l "$f"; done`
+> `for f in STARTUP_AI.{{AI}}ai readme_AI.{{AI}}ai CLAUDE.md ai_context/ai_rules.{{AI}}ai ai_context/glossary.{{AI}}ai ai_context/CURRENT_MISSION.md ai_context/START_HERE.md; do wc -l "$f"; done`
+>
+> Or just read the number drift-sweep already computes: `bash .claude/skills/drift-sweep/sweep.sh . | grep "tier1 aggregate"`
 
 ## Path-Scoped Rules (load when matching paths are touched)
 
