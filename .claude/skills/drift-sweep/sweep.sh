@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.32 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.33 — detect code/substrate drift in a repo.
+#
+# v0.1.33 (SESSION-095, 2026-08-16): new `doc-coverage` category. doc-version
+# compares the version a SKILL.md CLAIMS against its script's banner — that
+# catches a stale doc and cannot catch an ABSENT one. Measured: the doc numbered
+# 16 checks while the code ran 24 categories, and 20 of those 24 never told the
+# reader their `--fail-on` handle anywhere, including `waystone-validity`, a
+# hard-FAIL category owning the heywy doorway test. A gate you cannot name is a
+# gate you cannot arm.
+#
+# Deliberately not one-numbered-check-per-category — some checks honestly own
+# several — only that no category is invisible. Fixing the doc to pass it added
+# the missing entries for branch-context, waystone-validity and the five
+# report-only WISL checks, and put a **Gate:** handle on all twenty.
 #
 # v0.1.32 (SESSION-095, 2026-08-16): new `agents-parity` category. Claude Code
 # auto-reads CLAUDE.md; every OTHER agent reads AGENTS.md first, so when the two
@@ -2604,6 +2617,58 @@ fi
 #
 # soft_fail: WARN by default, FAIL via --fail-on=doc-version. Advisory-first,
 # the same rollout every other soft_fail category here got.
+# ── 18. Doc coverage: every category must be documented ───────
+# doc-version (below) compares the version a SKILL.md CLAIMS against the version
+# its script declares. That catches a stale doc; it cannot catch an ABSENT one.
+# Measured 2026-08-16: the doc numbered 16 checks while the code ran 24
+# categories, and 20 of those 24 never told the reader their `--fail-on` handle
+# anywhere — including `waystone-validity`, a hard-FAIL category that owns the
+# heywy doorway test. A gate you cannot name is a gate you cannot arm.
+#
+# The rule is NOT one-numbered-check-per-category: some checks legitimately own
+# several (WISL validity and freshness are one story). The rule is that every
+# category name appears, in backticks, somewhere in the doc — which is also what
+# makes `--fail-on` discoverable at all.
+#
+# Only runs in the repo that OWNS the skill (symlinked dirs are the workspace
+# canonical seen from a consumer; saying this eleven times is how a report
+# becomes wallpaper — same skip rule as doc-version).
+CURRENT_CATEGORY="doc-coverage"
+section "Skill doc category coverage"
+if [ ! -d .claude/skills ]; then
+  pass "doc-coverage: no .claude/skills — skipping"
+else
+  dc_checked=0; dc_bad=0
+  for sd in .claude/skills/*; do
+    [ -d "$sd" ] || continue
+    [ -L "$sd" ] && continue
+    doc="$sd/SKILL.md"
+    [ -f "$doc" ] || continue
+    dc_cats=""
+    for _s in "$sd"/*.sh; do
+      [ -f "$_s" ] || continue
+      dc_cats="${dc_cats}$(grep -oE 'CURRENT_CATEGORY="[a-z-]+"' "$_s" 2>/dev/null | sed 's/.*="//;s/"//')"$'\n'
+    done
+    dc_cats=$(printf '%s' "$dc_cats" | grep -v '^$' | sort -u)
+    [ -n "$dc_cats" ] || continue           # skill defines no categories
+    dc_checked=$((dc_checked+1))
+    dc_missing=""
+    while IFS= read -r cat; do
+      [ -n "$cat" ] || continue
+      grep -qF -- "\`${cat}\`" "$doc" || dc_missing="${dc_missing} ${cat}"
+    done <<< "$dc_cats"
+    if [ -n "$dc_missing" ]; then
+      soft_fail "doc-coverage: $(basename "$sd")/SKILL.md never names these categories, so their --fail-on handles are undiscoverable:${dc_missing}"
+      dc_bad=$((dc_bad+1))
+    fi
+  done
+  if [ "$dc_checked" -eq 0 ]; then
+    pass "doc-coverage: no skill with documented categories"
+  elif [ "$dc_bad" -eq 0 ]; then
+    pass "doc-coverage: ${dc_checked} skill doc(s) name every category their script defines"
+  fi
+fi
+
 CURRENT_CATEGORY="doc-version"
 section "Skill doc version consistency"
 if [ ! -d .claude/skills ]; then
