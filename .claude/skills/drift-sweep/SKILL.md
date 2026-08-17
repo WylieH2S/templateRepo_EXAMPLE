@@ -43,7 +43,7 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracke
 bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-journals | jq '.exit_failures'
 ```
 
-## Checks (v0.1.35)
+## Checks (v0.1.36)
 
 1. **Working-tree health** — total uncommitted insertions+deletions (FAIL if > `DIFF_FAIL_THRESHOLD`, default 1000); dirty file count (WARN if > `DIRTY_FILES_WARN`, default 10); count of `+// vX.Y.Z` comment lines added in a single file's diff (FAIL if > `JOURNAL_DIFF_LINES_FAIL`, default 3).  **Gate:** `working-tree`
 2. **Untracked important docs** — any file under `git ls-files --others --exclude-standard` whose name contains `audit`/`findings`/`mission`/`handoff`/`decisions`/`charter`/`rules` and ends in `.md` or `.chloeai`. These should never be untracked.  **Gate:** `untracked-docs`
@@ -197,7 +197,9 @@ Exit code: 0 if no failures, 1 if any FAIL, 2 if cannot enter target repo.
 
 ## Versions
 
-- **v0.1.35 (current)** — **Three of the five report-only categories are armed.** Report-only is a holding pattern, not a destination: a check nobody can fail is a check people stop reading, and `boot-source-size` proved it by reporting for months that roughly half of all declared boot sources cannot arrive whole while nothing ever acted on it.
+- **v0.1.36 (current)** — **`--fleet` can no longer exit 0 having swept nothing.** Found while fleet-verifying C0 from `~/repoManager`: the control plane's only children are dotdirs, so `for _d in */` never entered its body — the run printed zero lines and exited 0. A clean fleet and an un-run fleet were the same observation, from the directory substrate work is most often done in. Now exits 2 naming the real fleet root. `validate-substrate` carried the identical bug and got the identical fix. A real fleet pass is byte-identical to v0.1.35 (1,243 lines sweep / 732 validate, verified).
+
+- **v0.1.35** — **Three of the five report-only categories are armed.** Report-only is a holding pattern, not a destination: a check nobody can fail is a check people stop reading, and `boot-source-size` proved it by reporting for months that roughly half of all declared boot sources cannot arrive whole while nothing ever acted on it.
 
   - `ownership-coverage` → **soft_fail** below `OWNERSHIP_COVERAGE_MIN_PCT` (default 80). Unclaimed source has no seam card, so WISL routing cannot find it.
   - `validation-age` → **soft_fail** past `VALIDATION_AGE_WARN_DAYS` (default 30). A card asserting a proof that has gone stale is asserting something it cannot support.

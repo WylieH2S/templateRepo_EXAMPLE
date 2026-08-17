@@ -21,13 +21,26 @@ if [ "${1:-}" = "--fleet" ]; then
   shift
   cd "${1:-.}" || { echo "Cannot enter ${1:-.}" >&2; exit 2; }
   _fleet_rc=0
+  _fleet_n=0
   for _d in */; do
     _r="${_d%/}"
     [ -d "$_r/.git" ] || continue
     echo "════════ $_r ════════"
     VALIDATE_FLEET_CHILD=1 bash "$SELF" "$_r" || _fleet_rc=1
+    _fleet_n=$((_fleet_n + 1))
     echo
   done
+  # A FLEET PASS THAT VALIDATED NOTHING MUST NOT EXIT 0 — same silent pass fixed in
+  # drift-sweep v0.1.36, found the same way. Aimed at ~/repoManager (whose only
+  # children are dotdirs) this loop never ran, printed nothing, and exited 0. Clean
+  # and never-ran were indistinguishable.
+  if [ "$_fleet_n" -eq 0 ]; then
+    echo "FAIL: --fleet validated 0 repos from $(pwd -P)" >&2
+    echo "  No child directory here contains a .git. The fleet root is the workspace" >&2
+    echo "  parent (~/GitHub), not the control-plane repo — run it from there, or pass" >&2
+    echo "  the root explicitly: validate.sh --fleet <fleet-root>" >&2
+    exit 2
+  fi
   exit "$_fleet_rc"
 fi
 

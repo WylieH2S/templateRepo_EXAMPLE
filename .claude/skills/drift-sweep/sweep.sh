@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.35 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.36 — detect code/substrate drift in a repo.
+#
+# v0.1.36 (SESSION-096, 2026-08-17): `--fleet` refuses to exit 0 after sweeping zero
+# repos. Found while fleet-verifying C0 from ~/repoManager: the control plane has no
+# non-dot child holding a .git, so the `for _d in */` loop never entered its body and
+# the run printed NOTHING and exited 0. A clean fleet and an un-run fleet were the
+# same observation, from the directory substrate work actually happens in. Now exits
+# 2 with the fleet root named. No change to a real fleet pass.
+
 #
 # v0.1.35 (SESSION-095, 2026-08-16): three of the five report-only categories are
 # ARMED. Report-only is a holding pattern, not a destination — a check nobody can
@@ -607,12 +615,14 @@ if [ "$FLEET_MODE" = "1" ]; then
   [ "$QUIET_OUTPUT" = "1" ] && _pass="$_pass --quiet"
   [ -n "$FAIL_ON_CATEGORIES" ] && _pass="$_pass --fail-on=$FAIL_ON_CATEGORIES"
   [ "$MAINTENANCE_MODE" = "1" ] && _pass="$_pass --maintenance"
+  _fleet_n=0
   for _d in */; do
     _r="${_d%/}"
     [ -d "$_r/.git" ] || continue
     echo "════════ $_r ════════"
     # shellcheck disable=SC2086
     SWEEP_FLEET_CHILD=1 bash "$SELF" $_pass "$_r" || _fleet_rc=1
+    _fleet_n=$((_fleet_n + 1))
     echo
   done
 
@@ -639,8 +649,23 @@ if [ "$FLEET_MODE" = "1" ]; then
       echo "════════ $(basename "$_sub") (control plane — outside the workspace root) ════════"
       # shellcheck disable=SC2086
       SWEEP_FLEET_CHILD=1 bash "$SELF" $_pass "$_sub" || _fleet_rc=1
+      _fleet_n=$((_fleet_n + 1))
       echo
     fi
+  fi
+
+  # A FLEET PASS THAT SWEPT NOTHING MUST NOT EXIT 0. Run `--fleet` from
+  # ~/repoManager and the loop above finds no child with a .git: the control plane's
+  # only subdirectories are dotdirs, which `*/` never matches. Before v0.1.36 that
+  # printed ZERO lines and exited 0 — indistinguishable from a clean fleet, from the
+  # one directory a substrate session is most likely to be sitting in when it commits.
+  # The same silent pass this tool exists to catch, inside the tool. Fail loudly.
+  if [ "$_fleet_n" -eq 0 ]; then
+    echo "FAIL: --fleet swept 0 repos from $(pwd -P)" >&2
+    echo "  No child directory here contains a .git. The fleet root is the workspace" >&2
+    echo "  parent (~/GitHub), not the control-plane repo — run it from there, or pass" >&2
+    echo "  the root explicitly: sweep.sh --fleet <fleet-root>" >&2
+    exit 2
   fi
   exit "$_fleet_rc"
 fi
