@@ -43,7 +43,7 @@ bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracke
 bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-journals | jq '.exit_failures'
 ```
 
-## Checks (v0.1.34)
+## Checks (v0.1.35)
 
 1. **Working-tree health** — total uncommitted insertions+deletions (FAIL if > `DIFF_FAIL_THRESHOLD`, default 1000); dirty file count (WARN if > `DIRTY_FILES_WARN`, default 10); count of `+// vX.Y.Z` comment lines added in a single file's diff (FAIL if > `JOURNAL_DIFF_LINES_FAIL`, default 3).  **Gate:** `working-tree`
 2. **Untracked important docs** — any file under `git ls-files --others --exclude-standard` whose name contains `audit`/`findings`/`mission`/`handoff`/`decisions`/`charter`/`rules` and ends in `.md` or `.chloeai`. These should never be untracked.  **Gate:** `untracked-docs`
@@ -70,11 +70,18 @@ bash .claude/skills/drift-sweep/sweep.sh --json --fail-on=working-tree,file-jour
 quietly commit fleet-wide substrate to a feature branch where nobody will find it. **soft_fail**.
   **Gate:** `branch-context`
 
-19. **The report-only WISL family** — five checks that measure rather than judge: `ownership-coverage`
-(waystones whose `owns` globs match nothing), `boot-source-size` (declared boot sources too large to
-arrive within the packet ceiling **BOOT-CONTRACT R5** defines), `validation-age` and `validation-liveness` (whether a card's
-`validation:` command is stale or no longer runs), and `continuity-age` (how long since a card's
-`continuity:` was rewritten). They print findings and never fail.
+19. **The WISL measurement family** — five checks that score a repo rather than diff it. Three are
+**armed** as of v0.1.35: `ownership-coverage` soft_fails below `OWNERSHIP_COVERAGE_MIN_PCT` (80% of
+tracked source files claimed by some card's `owns`), `validation-age` soft_fails past
+`VALIDATION_AGE_WARN_DAYS` (30 — a card asserting a proof that has gone stale), and
+`validation-liveness` soft_fails when a card's `validation:` command **cannot fail at all** (ends in
+`true`, so the card claims proof it never obtains). All three pass fleet-wide today by design: they
+are ratchets against future decay, not a remediation project. Two remain report-only with stated
+reasons — `boot-source-size` (declared boot sources larger than the packet ceiling **BOOT-CONTRACT
+R5** defines) has 117 live findings and is armed only once boot_path remediation lands; and
+`continuity-age` (staleness of a card's `continuity:`) measures adoption of `continuity_updated:`,
+which is **1-of-22 adopted** in the largest repo — an adopt-or-delete question about the convention
+itself, not a threshold.
   **Gate:** `ownership-coverage`, `boot-source-size`, `validation-age`, `validation-liveness`, `continuity-age`
 
 > **Report-only is a holding pattern, not a destination.** A check nobody can fail is a check people
@@ -190,7 +197,17 @@ Exit code: 0 if no failures, 1 if any FAIL, 2 if cannot enter target repo.
 
 ## Versions
 
-- **v0.1.34 (current)** — **The boot packet budget moves into the standard that should have owned it.** `bs_cap=$((16384 / bs_files))` was an arithmetic expression inside `boot-source-size`, and the number appeared in **no standard anywhere** — `BOOT-CONTRACT.chloeai` is 9 KB of normative rules and defined no ceiling at all. The gate was enforcing a budget the fleet could not read, disagree with, or change without opening the implementation. A constant with no owner is a magic number.
+- **v0.1.35 (current)** — **Three of the five report-only categories are armed.** Report-only is a holding pattern, not a destination: a check nobody can fail is a check people stop reading, and `boot-source-size` proved it by reporting for months that roughly half of all declared boot sources cannot arrive whole while nothing ever acted on it.
+
+  - `ownership-coverage` → **soft_fail** below `OWNERSHIP_COVERAGE_MIN_PCT` (default 80). Unclaimed source has no seam card, so WISL routing cannot find it.
+  - `validation-age` → **soft_fail** past `VALIDATION_AGE_WARN_DAYS` (default 30). A card asserting a proof that has gone stale is asserting something it cannot support.
+  - `validation-liveness` → **soft_fail** when a card's `validation:` command *cannot fail* — ends in `true`, so the card claims a proof it never obtains. This is the silent-pass class inside the cards themselves.
+
+  All three pass fleet-wide today, deliberately: they are ratchets against future decay, not a remediation project. Each was negative-tested by moving its threshold past reality — and for liveness, by rigging a card's command to `true` — because a gate that has never fired is a gate that has never been tested.
+
+  **The remaining two are unarmed for stated reasons, not by omission.** `boot-source-size` carries 117 live findings; arming it before the `boot_path` remediation would deliver the fix as noise. `continuity-age` measures adoption of `continuity_updated:`, which stands at **1 of 22** cards in the largest repo and 0 of 1 in five others — that is an adopt-or-delete decision about the convention, not a threshold to pick, so it goes to Wy rather than being settled by a default.
+
+- **v0.1.34** — **The boot packet budget moves into the standard that should have owned it.** `bs_cap=$((16384 / bs_files))` was an arithmetic expression inside `boot-source-size`, and the number appeared in **no standard anywhere** — `BOOT-CONTRACT.chloeai` is 9 KB of normative rules and defined no ceiling at all. The gate was enforcing a budget the fleet could not read, disagree with, or change without opening the implementation. A constant with no owner is a magic number.
 
   `BOOT-CONTRACT` **R5** now states `BOOT_PACKET_BUDGET_CHARS = 16384`, `BOOT_PACKET_SLOTS_INDEX = 8`, `BOOT_PACKET_SLOTS_SEAM = 4`, with the per-entry ceiling derived as `budget / slots` — 2048 chars for an index card, 4096 for a code seam. `sweep.sh` parses those through a new `standard_file()` helper that resolves fleet standards the same way `canonical_dir()` resolves canonical skills.
 

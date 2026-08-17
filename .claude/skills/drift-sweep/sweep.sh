@@ -1,5 +1,27 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.34 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.35 — detect code/substrate drift in a repo.
+#
+# v0.1.35 (SESSION-095, 2026-08-16): three of the five report-only categories are
+# ARMED. Report-only is a holding pattern, not a destination — a check nobody can
+# fail is a check people stop reading, and boot-source-size proved it by quietly
+# reporting for months that half of all declared boot sources cannot arrive whole
+# while nothing acted on it.
+#
+#   ownership-coverage  -> soft_fail below OWNERSHIP_COVERAGE_MIN_PCT (80)
+#   validation-age      -> soft_fail past VALIDATION_AGE_WARN_DAYS (30)
+#   validation-liveness -> soft_fail when a card's validation: cannot fail at all
+#
+# All three pass fleet-wide today, by design: they are ratchets against future
+# decay, not a remediation project. Each was negative-tested by moving its
+# threshold past reality (and, for liveness, by rigging a card's command to
+# `true`) to prove it can actually fire.
+#
+# The remaining two are NOT armed here, for stated reasons rather than by
+# omission. boot-source-size has 117 live findings and must wait until the
+# boot_path remediation lands, or it would arrive as noise. continuity-age
+# measures adoption of `continuity_updated:`, which is 1-of-22 adopted in the
+# largest repo — that is an adopt-or-delete decision about the convention, not a
+# threshold, and it belongs to Wy.
 #
 # v0.1.34 (SESSION-095, 2026-08-16): the boot packet budget moves OUT of this
 # script and into the standard that should always have owned it. `16384 / 4` was
@@ -532,6 +554,8 @@
 #   TIER1_BLOAT_WARN_KB       — always-loaded PER-FILE size WARN threshold in KB (default 25)
 #   TIER1_AGGREGATE_WARN_LINES — always-loaded TOTAL line budget (default 750, soft_fail)
 #   AGENTS_LAG_WARN_DAYS      — days AGENTS.md may trail CLAUDE.md (default 30, soft_fail)
+#   OWNERSHIP_COVERAGE_MIN_PCT — min %% of source files claimed by a card's owns (default 80)
+#   VALIDATION_AGE_WARN_DAYS  — days a card's validation: may go unproven (default 30)
 #   WRAP_CARRIER              — wrap-continuity carrier override (default: auto-detect
 #                               readme_AI.chloeai, else the workspace HANDOFF log)
 #   WRAP_LAG_WARN             — commits the carrier may lag HEAD before wrap-continuity
@@ -678,6 +702,8 @@ SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
 TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
 TIER1_AGGREGATE_WARN_LINES="${TIER1_AGGREGATE_WARN_LINES:-750}"
 AGENTS_LAG_WARN_DAYS="${AGENTS_LAG_WARN_DAYS:-30}"
+OWNERSHIP_COVERAGE_MIN_PCT="${OWNERSHIP_COVERAGE_MIN_PCT:-80}"
+VALIDATION_AGE_WARN_DAYS="${VALIDATION_AGE_WARN_DAYS:-30}"
 WRAP_CARRIER="${WRAP_CARRIER:-}"
 WRAP_LAG_WARN="${WRAP_LAG_WARN:-10}"
 
@@ -1941,7 +1967,7 @@ fi
 # means anything, and expect the answer to be a per-repo expected value rather than a
 # fleet threshold.
 CURRENT_CATEGORY="ownership-coverage"
-section "WISL ownership coverage (report-only)"
+section "WISL ownership coverage"
 if [ ! -d .git ]; then
   pass "ownership-coverage: not a git repo — skipping"
 else
@@ -1982,7 +2008,12 @@ else
         $0 != "" { for (j = 1; j <= p; j++) if ($0 ~ pats[j]) { hit++; break } }
         END { print hit + 0 }' "$oc_gf" "$oc_sf")
       rm -f "$oc_gf" "$oc_sf"
-      pass "ownership-coverage: ${oc_covered}/${oc_total} tracked source file(s) claimed by some card's owns ($(( oc_covered * 100 / oc_total ))%)"
+      oc_pct=$(( oc_covered * 100 / oc_total ))
+      if [ "$oc_pct" -lt "$OWNERSHIP_COVERAGE_MIN_PCT" ]; then
+        soft_fail "ownership-coverage: only ${oc_covered}/${oc_total} tracked source file(s) claimed by some card's owns (${oc_pct}%, floor ${OWNERSHIP_COVERAGE_MIN_PCT}%) — unclaimed code has no seam card, so WISL routing cannot find it"
+      else
+        pass "ownership-coverage: ${oc_covered}/${oc_total} tracked source file(s) claimed by some card's owns (${oc_pct}%)"
+      fi
     fi
   fi
 fi
@@ -2063,7 +2094,7 @@ else
 fi
 
 CURRENT_CATEGORY="validation-age"
-section "WISL validation age (report-only)"
+section "WISL validation age"
 if [ ! -d .git ]; then
   pass "validation-age: not a git repo — skipping"
 else
@@ -2079,7 +2110,12 @@ else
       pass "validation-age: ${wf} — validated_at ${va_sha} does not resolve in git history"
       continue
     fi
-    pass "validation-age: ${wf} — $(( ( $(date +%s) - va_time ) / 86400 ))d since the validation: command last passed (${va_sha})"
+    va_days=$(( ( $(date +%s) - va_time ) / 86400 ))
+    if [ "$va_days" -gt "$VALIDATION_AGE_WARN_DAYS" ]; then
+      soft_fail "validation-age: ${wf} — ${va_days}d since the validation: command last passed (${va_sha}), past the ${VALIDATION_AGE_WARN_DAYS}d threshold — the card asserts a proof that has gone stale"
+    else
+      pass "validation-age: ${wf} — ${va_days}d since the validation: command last passed (${va_sha})"
+    fi
   done < <(find . -type f -name "_waystone.${AI_EXT}" -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   [ "$va_seen" -eq 0 ] && pass "validation-age: no cards carry validated_at (field not yet adopted)"
 fi
@@ -2107,7 +2143,7 @@ fi
 # `grep` is deliberately NOT in the filter list: grep exits 1 on no-match, so a terminal
 # `| grep -q x` is a meaningful assertion, not a mask.
 CURRENT_CATEGORY="validation-liveness"
-section "WISL validation liveness (report-only)"
+section "WISL validation liveness"
 vl_seen=0
 vl_dead=0
 while IFS= read -r wf; do
@@ -2145,7 +2181,7 @@ if [ "$vl_seen" -eq 0 ]; then
 elif [ "$vl_dead" -eq 0 ]; then
   pass "validation-liveness: all ${vl_seen} validation: command(s) can return non-zero"
 else
-  pass "validation-liveness: ${vl_dead} of ${vl_seen} validation: command(s) cannot fail — they report success unconditionally"
+  soft_fail "validation-liveness: ${vl_dead} of ${vl_seen} validation: command(s) CANNOT FAIL — they report success unconditionally, so the card claims proof it never obtains"
 fi
 
 CURRENT_CATEGORY="continuity-age"
