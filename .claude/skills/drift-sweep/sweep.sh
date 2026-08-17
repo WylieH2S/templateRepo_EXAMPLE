@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.31 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.32 — detect code/substrate drift in a repo.
+#
+# v0.1.32 (SESSION-095, 2026-08-16): new `agents-parity` category. Claude Code
+# auto-reads CLAUDE.md; every OTHER agent reads AGENTS.md first, so when the two
+# drift a non-Claude agent resumes from a stale picture and can silently undo
+# work. That is the near-loss recorded as OperationFarmstock DEC-044. The rule
+# was written down and nothing enforced it; 3 repos had drifted 41-77 days.
+#
+# It deliberately does NOT compare line counts. The obvious implementation —
+# "AGENTS.md should be roughly as long as CLAUDE.md" — is wrong: planTheBeast's
+# 18-line file is a complete boot instruction while a 42-line one elsewhere just
+# delegates. Gating the wrong property trains people to pad files. What matters
+# is whether AGENTS.md was REVISITED when CLAUDE.md moved, which git answers
+# exactly. Same two-part shape as up-sync: staged-together at the commit that
+# creates the drift, plus a lag threshold for the backlog that predates the gate.
 #
 # v0.1.31 (SESSION-095, 2026-08-16): tier1-bloat gains the AGGREGATE budget the
 # charter always stated and nothing ever checked, and the definition of "Tier 1"
@@ -489,6 +503,7 @@
 #   TIER1_FILES               — space-separated always-loaded substrate files to size-check
 #   TIER1_BLOAT_WARN_KB       — always-loaded PER-FILE size WARN threshold in KB (default 25)
 #   TIER1_AGGREGATE_WARN_LINES — always-loaded TOTAL line budget (default 750, soft_fail)
+#   AGENTS_LAG_WARN_DAYS      — days AGENTS.md may trail CLAUDE.md (default 30, soft_fail)
 #   WRAP_CARRIER              — wrap-continuity carrier override (default: auto-detect
 #                               readme_AI.chloeai, else the workspace HANDOFF log)
 #   WRAP_LAG_WARN             — commits the carrier may lag HEAD before wrap-continuity
@@ -634,6 +649,7 @@ BACKSTOP_CHECK="${BACKSTOP_CHECK:-1}"
 SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
 TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
 TIER1_AGGREGATE_WARN_LINES="${TIER1_AGGREGATE_WARN_LINES:-750}"
+AGENTS_LAG_WARN_DAYS="${AGENTS_LAG_WARN_DAYS:-30}"
 WRAP_CARRIER="${WRAP_CARRIER:-}"
 WRAP_LAG_WARN="${WRAP_LAG_WARN:-10}"
 
@@ -2151,6 +2167,57 @@ else
       soft_fail "up-sync stale: readme_AI moved since the last published hint — append an ai_context/upsync.${AI_EXT} block (commit it WITH the substrate change so timestamps match)"
     else
       pass "up-sync hint current (readme_AI not ahead of last hint)"
+    fi
+  fi
+fi
+
+# ── 12a. AGENTS.md parity (2026-08-16) ────────────────────────
+# Claude Code auto-reads CLAUDE.md; EVERY other agent reads AGENTS.md first. When
+# the two drift, a non-Claude agent resumes from a stale picture of the repo and
+# can silently undo work the Claude side just did. That is not hypothetical — it
+# is why the rule exists (OperationFarmstock DEC-044, where a whole untracked 3D
+# model was nearly lost). The rule was written down and NOTHING enforced it.
+#
+# THIS DELIBERATELY DOES NOT COMPARE LINE COUNTS. The obvious implementation is
+# "AGENTS.md should be about as long as CLAUDE.md", and it is wrong: measured
+# 2026-08-16, planTheBeast's 18-line AGENTS.md is a complete, coherent boot
+# instruction while Planitaria's 42-line one delegates to CLAUDE.md. Length is
+# not the property that matters, and a gate on the wrong property trains people
+# to pad files. What matters is whether AGENTS.md was REVISITED when CLAUDE.md
+# changed, which git can answer exactly.
+#
+# Same two-part shape as up-sync above, for the same reason: catch it at the
+# commit that creates the drift (staged together), and catch the backlog that
+# predates the gate (last-commit lag). Lag threshold rather than up-sync's
+# zero-tolerance, because plenty of CLAUDE.md edits — a Tier 2 row, a typo —
+# genuinely do not change what another agent needs to know.
+CURRENT_CATEGORY="agents-parity"
+section "AGENTS.md parity (cross-AI resume)"
+if [ ! -f CLAUDE.md ]; then
+  pass "agents-parity: no CLAUDE.md — nothing to mirror"
+elif [ ! -d .git ]; then
+  pass "agents-parity: not a git repo — skipping"
+elif [ ! -f AGENTS.md ]; then
+  soft_fail "agents-parity: CLAUDE.md exists but AGENTS.md does not — every non-Claude agent boots from AGENTS.md, so this repo has no cross-AI entry point at all"
+else
+  ap_claude_staged=0; git diff --cached --quiet -- CLAUDE.md 2>/dev/null || ap_claude_staged=1
+  ap_agents_staged=0; git diff --cached --quiet -- AGENTS.md 2>/dev/null || ap_agents_staged=1
+  if [ "$ap_claude_staged" -eq 1 ] && [ "$ap_agents_staged" -eq 0 ]; then
+    soft_fail "agents-parity: CLAUDE.md is staged without AGENTS.md — if this change alters how a session boots, mirror it now; another agent reads AGENTS.md and will not see it"
+  elif [ "$ap_claude_staged" -eq 1 ]; then
+    pass "agents-parity: CLAUDE.md and AGENTS.md staged together"
+  else
+    ap_c=$(git log -1 --format=%ct -- CLAUDE.md 2>/dev/null)
+    ap_a=$(git log -1 --format=%ct -- AGENTS.md 2>/dev/null)
+    if [ -z "$ap_c" ] || [ -z "$ap_a" ]; then
+      pass "agents-parity: no commit history for one of the pair — skipping"
+    else
+      ap_lag=$(( (ap_c - ap_a) / 86400 ))
+      if [ "$ap_lag" -gt "$AGENTS_LAG_WARN_DAYS" ]; then
+        soft_fail "agents-parity: AGENTS.md is ${ap_lag} days behind CLAUDE.md (threshold ${AGENTS_LAG_WARN_DAYS}) — re-read CLAUDE.md and mirror anything that changed how a session boots, then commit both"
+      else
+        pass "agents-parity: AGENTS.md within ${AGENTS_LAG_WARN_DAYS} days of CLAUDE.md"
+      fi
     fi
   fi
 fi
