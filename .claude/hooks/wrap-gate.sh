@@ -205,4 +205,30 @@ if [ -n "$backstop_lines" ]; then
   echo "⚠ BACKSTOP (server-side CI — what catches a bypassed local gate):"
   printf '%s\n' "$backstop_lines"
 fi
+
+# --- versioned git hooks: installed, or merely present? (SESSION-098) ---
+# A hook committed to the repo is NOT a hook that runs. `core.hooksPath` is local
+# config, so it does not travel with a clone — the Mini pulling this repo gets the
+# script and none of the enforcement, and a gate that is present but unwired fails
+# exactly the way a gate that does not exist fails: silently.
+#
+# Deliberately a WARNING, not a self-install. Setting the config from here would be
+# a hook silently mutating git config on a machine whose owner never asked — cheap
+# to reverse, but surprising, and surprise is how trust in these banners dies.
+# Naming the one-line fix is the mechanism; running it is the owner's call.
+if [ -d "$R/.claude/githooks" ]; then
+  _hp=$(git -C "$R" config --get core.hooksPath 2>/dev/null || true)
+  _missing=""
+  if [ "$_hp" != ".claude/githooks" ]; then
+    _missing="core.hooksPath is '${_hp:-<unset, using .git/hooks>}'"
+  elif [ ! -x "$R/.claude/githooks/pre-commit" ]; then
+    _missing="pre-commit is not executable"
+  fi
+  if [ -n "$_missing" ]; then
+    echo "⚠ GIT HOOKS ($(basename "$R")): versioned hooks present but NOT ACTIVE — ${_missing}."
+    echo "   Local commits are not being format-checked. Install with:"
+    echo "     git -C \"$R\" config core.hooksPath .claude/githooks"
+    echo "     chmod +x \"$R\"/.claude/githooks/*"
+  fi
+fi
 exit 0
