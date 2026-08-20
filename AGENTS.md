@@ -1,9 +1,9 @@
 # AGENTS.md
 
 <INSTRUCTIONS>
-Read `readme_AI.{{AI}}ai` before analysis or execution when repo access exists.
-
 Use `STARTUP_AI.{{AI}}ai` as the repo bootstrap. Follow its READ_ORDER section in order.
+
+Read `readme_AI.{{AI}}ai` before analysis or execution when repo access exists.
 
 Treat the `ai_context/` package as the evolving project continuity. The lean entry point is `ai_context/START_HERE.md`.
 
