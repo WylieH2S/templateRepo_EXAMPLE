@@ -1,6 +1,6 @@
 .{{AI}}ai Template
 #{{AIHEADER}}:1
-U="Rangers lead the way!"
+U="{{UNLOCK_PHRASE}}"
 TZ=America/New_York
 MODE="CHARTER-HI-Mode-2026-02"
 
