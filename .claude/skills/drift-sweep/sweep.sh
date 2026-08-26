@@ -1,5 +1,18 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.44 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.45 — detect code/substrate drift in a repo.
+#
+# v0.1.45 (SESSION-111, 2026-08-26): new `journal-order`. An entry filed at the wrong end
+#   of a journal is invisible, and a CORRECTION filed there is worse than none. On
+#   2026-08-17 four entries were appended to the END of drift_log.chloeai — a newest-first
+#   file — landing below entries from May. One reversed the entry directly above it (the
+#   16,384 boot-budget verdict), and that reversal sat at the bottom of a 158 KB file for
+#   nine days until a session grepped the log, hit the superseded claim and reported it as
+#   current. The substrate HAD the fix; nothing put it where it would be read. Cause was
+#   not carelessness: the log's own header said "Append a new entry" while the file was
+#   maintained newest-first, so following the written instruction produced exactly this.
+#   Judges CONSISTENCY, never a chosen direction — drift_log is newest-first, ski_lift_log
+#   deliberately oldest-first, both correct — inferring direction per SECTION from the
+#   entries themselves, and staying silent on a tie rather than guessing.
 #
 # v0.1.44 (SESSION-111, 2026-08-26): `tier1-bloat` had TWO thresholds and neither was
 #   derived; both were measurably naming the wrong thing. The per-file 25 KB was picked
@@ -1620,6 +1633,84 @@ if [ -d .git ]; then
   fi
 fi
 [ "$cruft_found" -eq 0 ] && pass "no obvious cruft directories or versioned backups"
+
+# ── 3a. Journal entry ordering (v0.1.45, soft_fail) ───────────
+# AN ENTRY FILED AT THE WRONG END OF A JOURNAL IS INVISIBLE, AND A CORRECTION FILED THERE
+# IS WORSE THAN NO CORRECTION. On 2026-08-17 four entries were appended to the END of
+# drift_log.chloeai — a NEWEST-first file — landing below entries from May. One of them
+# reversed the entry directly above it (the 16,384 boot-budget verdict: "never derived"
+# was wrong; the number has a full derivation chain). That reversal sat at the bottom of
+# a 158 KB file for nine days, until a session grepped the log, hit the superseded claim,
+# and reported it as current. The substrate HAD the fix. Nothing put it where it would
+# be read.
+#
+# The cause was not carelessness: the log's own header said "Append a new entry" while
+# the file was maintained newest-first. Whoever followed the written instruction produced
+# exactly this. That is now fixed in prose, and this is the mechanism, because a
+# convention that lives only in prose is what the fleet has repeatedly paid for.
+#
+# JUDGES CONSISTENCY, NEVER A CHOSEN DIRECTION. drift_log.chloeai is newest-first;
+# ski_lift_log.chloeai is deliberately oldest-first; both are correct. So the direction
+# is INFERRED per section from the entries themselves — the majority of ordered adjacent
+# pairs wins — and only entries contradicting their own file are reported. Sections
+# (`^# HEADING`) reset the comparison, because a status-partitioned journal orders within
+# each partition, not across them.
+#
+# THE PROXY, AND HOW IT PASSES FALSELY (charter rule for any new gate). The proxy is DATE
+# MONOTONICITY, which is not the property that matters — the property is "a reader will
+# find this". Blind in three ways: (1) it cannot see a correction that is filed in the
+# right PLACE but never LINKED to what it reverses (that is what the `Superseded by:`
+# convention is for, and it is prose, not gated); (2) a section whose dates are mostly
+# equal has a weak majority, so a tie yields no finding rather than a guess; (3) it says
+# nothing about content — an entry in perfect date order can still be wrong. It closes
+# one failure mode: filing at the wrong end.
+CURRENT_CATEGORY="journal-order"
+section "Journal entry ordering"
+jo_files=$(git ls-files 2>/dev/null | grep -E "(drift_log|ski_lift_log|_log)\.(${AI_EXT_RE}|md)$" || true)
+if [ -z "$jo_files" ]; then
+  pass "journal-order: no dated journal files tracked here"
+else
+  jo_findings=0; jo_checked=0
+  while IFS= read -r jo_f; do
+    [ -n "$jo_f" ] && [ -f "$jo_f" ] || continue
+    jo_out=$(awk '
+      function flush(  i, asc, desc, dir, bad) {
+        if (n < 3) { n = 0; return }
+        asc = 0; desc = 0
+        for (i = 2; i <= n; i++) { if (d[i] > d[i-1]) asc++; else if (d[i] < d[i-1]) desc++ }
+        if (asc == desc) { n = 0; return }          # tie: no direction to contradict
+        dir = (desc > asc) ? "newest-first" : "oldest-first"
+        for (i = 2; i <= n; i++) {
+          bad = (desc > asc) ? (d[i] > d[i-1]) : (d[i] < d[i-1])
+          if (bad) printf "%s\t%s\t%s\t%s\t%s\n", sec, dir, ln[i], d[i], hd[i]
+        }
+        n = 0
+      }
+      /^# [A-Z]/ { flush(); sec = $0; next }
+      /^### [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ {
+        if (sec == "") next
+        n++; d[n] = substr($0, 5, 10); ln[n] = NR; hd[n] = substr($0, 5, 86)
+      }
+      END { flush() }
+    ' "$jo_f" 2>/dev/null)
+    jo_checked=$((jo_checked+1))
+    [ -n "$jo_out" ] || continue
+    while IFS=$'\t' read -r jo_sec jo_dir jo_ln jo_d jo_hd; do
+      [ -n "$jo_d" ] || continue
+      jo_findings=$((jo_findings+1))
+      soft_fail "journal-order: ${jo_f}:${jo_ln} is dated ${jo_d} but sits out of order in a ${jo_dir} section (${jo_sec}) — an entry filed at the wrong end is invisible, and a CORRECTION filed there is worse than none. Move it into date position; if it reverses an earlier entry, stamp that entry with a Superseded-by line too. ${jo_hd}"
+    done <<EOF
+$jo_out
+EOF
+  done <<EOF
+$jo_files
+EOF
+  if [ "$jo_checked" -eq 0 ]; then
+    pass "journal-order: no dated journal files reachable"
+  elif [ "$jo_findings" -eq 0 ]; then
+    pass "journal-order: ${jo_checked} journal file(s), every dated entry in its section's own order"
+  fi
+fi
 
 # ── 4. File-header probe journals ─────────────────────────────
 CURRENT_CATEGORY="file-journals"
