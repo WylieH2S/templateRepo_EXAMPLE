@@ -21,7 +21,9 @@
 # script's own physical path, so it works from any cwd / the non-git parent):
 #   1. commits since the last HANDOFF block (last commit touching the carrier)
 #   2. unpushed commits (@{u}..HEAD)
-#   3. uncommitted changes (excl. known runtime churn: .repo-manager/queue/)
+#   3. uncommitted changes (excl. known runtime churn: .repo-manager/queue/,
+#      .repo-manager/active_sessions.* — the latter is written by session-claim.sh
+#      at the very SessionStart this gate runs in)
 #
 # Advisory only: ALWAYS exits 0 — a SessionStart gate must never block the session.
 
@@ -103,9 +105,20 @@ if git -C "$R" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&
   fi
 fi
 
-# 3. uncommitted changes (excl. known runtime churn — workspace daemon queue/;
-#    harmless no-op in repos that have no such path)
-dirty=$(git -C "$R" status --porcelain 2>/dev/null | grep -v '\.repo-manager/queue/' || true)
+# 3. uncommitted changes (excl. known runtime churn — workspace daemon queue/ and
+#    the session-claim register; harmless no-ops in repos that have no such path)
+#
+# active_sessions.chloeai joined the list 2026-08-22 (SESSION-107) because
+# session-claim.sh WRITES it at SessionStart — the same SessionStart that runs this
+# gate. The claim landed, the tree went dirty, and this gate then reported "a prior
+# session may not have wrapped" about a session that had not yet done anything. One
+# hook manufacturing the exact condition another hook alarms on is a false positive
+# with a guaranteed 100% hit rate, and a gate that fires on every single boot is a
+# gate people learn to scroll past — which would have cost us the REAL unwrapped-work
+# warning this exists to give.
+dirty=$(git -C "$R" status --porcelain 2>/dev/null \
+        | grep -v '\.repo-manager/queue/' \
+        | grep -v '\.repo-manager/active_sessions\.' || true)
 if [ -n "$dirty" ]; then
   n=$(printf '%s\n' "$dirty" | grep -c .)
   details+="  • ${n} uncommitted change(s) (excl. runtime churn):"$'\n'
