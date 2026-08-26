@@ -1,5 +1,70 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.36 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.43 — detect code/substrate drift in a repo.
+#
+# v0.1.43 (SESSION-111, 2026-08-25): four rules that had been WRITTEN DOWN AND NEVER
+#   CHECKED get gates. `handoff-block-size` and `handoff-rotation` enforce the two
+#   charter rules in hi-mode/SKILL.md ("keep a block under 4,096 bytes", "rotate at ~5
+#   sessions / ~25 KB"), neither of which anything measured. The block-size gate was
+#   blocked for months on AMBIGUITY, not code: a block had two definitions 19 bytes
+#   apart (INDEX.chloeai:60 records SESSION-109-FORK at both 4,096 and 4,077 B), and a
+#   ceiling with two definitions passes or fails on who ran it. The boundary is now
+#   fixed — `@` header line through the final `signed=`, trailing separator excluded —
+#   and lives in ONE helper both categories call, so they cannot disagree. Rotation is
+#   measured on LIVE BLOCK PAYLOAD, not file size: the log's 4,829-byte format header is
+#   not rotatable, so sizing the file reports rotation due ~19% early forever.
+#   `dead-config-key` (UNARMED) catches a pin that outlived its reader — two happened in
+#   one week and NEITHER FAILED. `dev-flag-always-on` catches an argument a plist's own
+#   comment calls dev-only being passed by a RunAtLoad/KeepAlive agent, the shape that
+#   ran `chloe start --headless` in prod for 70 days. It reads arguments from the
+#   comment-STRIPPED body and warnings from the comments, because the live plist quotes
+#   its own retired warning verbatim and a whole-file grep fires on the fix.
+#
+# v0.1.42 (SESSION-108, 2026-08-23): `boot-source-size` stops dividing and starts
+#   SIMULATING. Its per-entry cap was `BUDGET / slots` — which BOOT-CONTRACT R5 also
+#   said, and which the materializer has never done. The real allocator recomputes
+#   `(remaining) // (remaining_slots)` per entry, so surplus flows FORWARD and a card
+#   with 3 entries divides by 3. Cost of the old model, measured fleet-wide: 18
+#   findings calling files undeliverable that a boot delivers whole, and total
+#   blindness to the worse case — 5 entries declared past the slot limit that are
+#   never opened at all. Both now correct, and R5's MUST NOT on entry count is gated
+#   for the first time. Sizes are counted in CHARS (wc -m) to match the standard's
+#   unit; they were bytes. Reference: .repo-manager/boot-packet-sim.py.
+#
+# v0.1.41 (SESSION-108, 2026-08-23): `boot-source-size`'s own summary line was a ✓
+#   in the non-quiet FAILING branch — the last line of a red section read green and
+#   --json carried a "status":"pass" record for unresolved findings. v0.1.40 fixed
+#   that shape in the per-file lines and left it in the summary. Exit codes and
+#   which findings fire are unchanged.
+#
+# v0.1.40 (SESSION-107, 2026-08-22): `boot-source-size` stops reporting a defect as a
+#   pass. It had been REPORT-ONLY since v0.1.15, printing ~50 fleet findings — the HI
+#   Mode charter at 18%, ROSTER.md at 5%, cli/main.py at 3% — every one of them a ✓.
+#   Now two cohorts: ACCEPTED (declared under `boot_path_partial:` WITH a `# reason`)
+#   and HARMFUL (everything else, soft_fail, armable). Accepted lines still print the
+#   delivery percentage so an exemption cannot hide its cost. Paired with the
+#   `validate_context_receipt` sufficiency fix in planTheBeast: a dispatched agent
+#   could prove it used the right card while receiving 18% of it, and the receipt
+#   classified that "verified" — identity was being read as sufficiency at both ends.
+#
+# v0.1.39 (SESSION-106, 2026-08-22): `route-accuracy` was measuring NOTHING under a
+#   color-forcing terminal. It greps `chloe route-check` output for a `^FAIL <repo>`
+#   verdict; Rich emits ANSI when the environment says to (FORCE_COLOR=3 is the default
+#   in several agent shells), so the line arrived as "\033[31mFAIL\033[0m planTheBeast",
+#   the anchor missed, and the category reported COULD NOT CHECK — a warning shaped like
+#   an infrastructure hiccup while the gate ran blind. Color pinned off AND stripped.
+#   Also: SKILL.md had missed the v0.1.38 release entirely; its doc gates only run from
+#   ~/repoManager, and v0.1.38 was verified from planTheBeast where the skill is a symlink.
+#
+# v0.1.38 (SESSION-105, 2026-08-22): new `seam-partial` category (soft_fail, UNARMED).
+#   Catches the hole seam-coverage-definition §1 documents and §4 declined to close:
+#   a folder that should have been declared and never was. Judges sibling CONSISTENCY,
+#   not seam-worthiness, so it needs no threshold. Blind to a uniformly-undeclared
+#   cohort by design — a ratchet, not a census. 6 findings fleet-wide at introduction.
+#
+# v0.1.37 (SESSION-104, 2026-08-21): new `route-accuracy` category (soft_fail).
+# WISL had five categories measuring the page table's SHAPE and none measuring
+# whether a question RESOLVES through it. Advisory-first: planTheBeast is
+# deliberately RED at 4/9, and an unmeasured WISL repo WARNS rather than passes.
 #
 # v0.1.36 (SESSION-096, 2026-08-17): `--fleet` refuses to exit 0 after sweeping zero
 # repos. Found while fleet-verifying C0 from ~/repoManager: the control plane has no
@@ -568,6 +633,13 @@
 #                               readme_AI.chloeai, else the workspace HANDOFF log)
 #   WRAP_LAG_WARN             — commits the carrier may lag HEAD before wrap-continuity
 #                               flags (default 10)
+#   HANDOFF_BLOCK_MAX_BYTES   — per-HANDOFF-block ceiling in bytes (default 4096; the
+#                               boundary is the `@` header line through the final
+#                               `signed=` line, trailing separator EXCLUDED)
+#   HANDOFF_ROTATE_WARN_BYTES — LIVE BLOCK PAYLOAD past which rotation is due
+#                               (default 25600). Payload, not file size: the log's
+#                               format header is not rotatable and must not count.
+#   HANDOFF_ROTATE_WARN_BLOCKS — live block count past which rotation is due (default 5)
 #
 # The tier1-bloat category is ADVISORY (warn-only) — it never counts toward the
 # exit code, so it cannot be gated via --fail-on. It enforces the ADR-004 paging
@@ -731,6 +803,9 @@ OWNERSHIP_COVERAGE_MIN_PCT="${OWNERSHIP_COVERAGE_MIN_PCT:-80}"
 VALIDATION_AGE_WARN_DAYS="${VALIDATION_AGE_WARN_DAYS:-30}"
 WRAP_CARRIER="${WRAP_CARRIER:-}"
 WRAP_LAG_WARN="${WRAP_LAG_WARN:-10}"
+HANDOFF_BLOCK_MAX_BYTES="${HANDOFF_BLOCK_MAX_BYTES:-4096}"
+HANDOFF_ROTATE_WARN_BYTES="${HANDOFF_ROTATE_WARN_BYTES:-25600}"
+HANDOFF_ROTATE_WARN_BLOCKS="${HANDOFF_ROTATE_WARN_BLOCKS:-5}"
 
 # ── Carrier extensions, RESOLVED not hardcoded (v0.1.29) ──────
 #
@@ -2043,7 +2118,7 @@ else
   fi
 fi
 
-# ── 9d. Boot-source deliverability (v0.1.15, REPORT-ONLY) ─────
+# ── 9d. Boot-source deliverability (v0.1.15; soft_fail since v0.1.40) ─────
 # Which declared boot sources are physically too large to ever arrive whole?
 #
 # The context packet allocates max_chars // max_files per entry, so there is a hard
@@ -2057,12 +2132,30 @@ fi
 # tier1-bloat while delivering 24% of itself forever. seam-coverage does not look at
 # sizes at all.
 #
-# REPORT-ONLY, because over-cap is not automatically wrong: some files are essential
-# AND big (a 27 KB charter), and the fix there is to shrink the FILE — rotate the log,
-# page the history — not to stop declaring it. This says which ones, and how little of
-# each actually lands.
+# v0.1.40 (SESSION-107) SPLIT THIS INTO TWO COHORTS. Report-only was the right call
+# at v0.1.15 and the wrong one to leave standing: over-cap is not automatically wrong
+# — some files are essential AND big — but "not automatically wrong" was being spent
+# as "fine", and every one of ~50 fleet findings printed as a ✓. A category that
+# reports a defect as a pass is a category nothing ever acts on.
+#
+# So the card now has to SAY which it is:
+#   ACCEPTED — listed under `boot_path_partial:` WITH a trailing `# reason`. The
+#              130 KB cli/main.py declared for orientation is legitimate; saying so
+#              out loud is the whole point.
+#   HARMFUL  — everything else. soft_fail, armable with --fail-on=boot-source-size.
+# The fix for a harmful one is to shrink the FILE — rotate the log, page the history —
+# not to stop declaring it, and not to reach for the exemption.
+#
+# THE PROXY, and how it passes falsely: `boot_path_partial:` is a SELF-DECLARED
+# exemption, so a card can silence a real problem by listing the path. Three things
+# bound that. (1) A reason is mandatory — a bare path fails, because an exemption with
+# no stated reason is a silencer rather than a decision. (2) The accepted line still
+# prints the delivery percentage, so the cost stays visible in every run instead of
+# disappearing into a pass. (3) It exempts one NAMED path on one card; there is no
+# wildcard, so it cannot become the `owns: **` of boot paths. What it still cannot
+# catch is a plausible-sounding reason that is simply untrue — that one is on review.
 CURRENT_CATEGORY="boot-source-size"
-section "Boot-source deliverability (report-only)"
+section "Boot-source deliverability"
 # THE BUDGET IS THE STANDARD'S, NOT THIS SCRIPT'S (2026-08-16). `16384 / 4` used to
 # be an arithmetic expression right here and appeared in no standard anywhere, so
 # the gate enforced a number the fleet could not read, argue with, or change
@@ -2073,48 +2166,133 @@ section "Boot-source deliverability (report-only)"
 # the defect this change removes, and would keep reporting confident percentages
 # derived from a number nobody could see.
 BS_STD=$(standard_file "boot-contract/BOOT-CONTRACT.${AI_EXT}" 2>/dev/null || true)
-BS_BUDGET=""; BS_SLOTS_INDEX=""; BS_SLOTS_SEAM=""
+BS_BUDGET=""; BS_SLOTS_INDEX=""; BS_SLOTS_SEAM=""; BS_MAXSRC=""
 if [ -n "$BS_STD" ]; then
   BS_BUDGET=$(grep -oE 'BOOT_PACKET_BUDGET_CHARS[[:space:]]*=[[:space:]]*[0-9]+' "$BS_STD" | grep -oE '[0-9]+$' | head -1)
   BS_SLOTS_INDEX=$(grep -oE 'BOOT_PACKET_SLOTS_INDEX[[:space:]]*=[[:space:]]*[0-9]+' "$BS_STD" | grep -oE '[0-9]+$' | head -1)
   BS_SLOTS_SEAM=$(grep -oE 'BOOT_PACKET_SLOTS_SEAM[[:space:]]*=[[:space:]]*[0-9]+' "$BS_STD" | grep -oE '[0-9]+$' | head -1)
+  BS_MAXSRC=$(grep -oE 'BOOT_PACKET_MAX_SOURCE_CHARS[[:space:]]*=[[:space:]]*[0-9]+' "$BS_STD" | grep -oE '[0-9]+$' | head -1)
 fi
-if [ -z "$BS_BUDGET" ] || [ -z "$BS_SLOTS_INDEX" ] || [ -z "$BS_SLOTS_SEAM" ] || [ "$BS_SLOTS_INDEX" -eq 0 ] || [ "$BS_SLOTS_SEAM" -eq 0 ]; then
+if [ -z "$BS_BUDGET" ] || [ -z "$BS_SLOTS_INDEX" ] || [ -z "$BS_SLOTS_SEAM" ] || [ -z "$BS_MAXSRC" ] || [ "$BS_SLOTS_INDEX" -eq 0 ] || [ "$BS_SLOTS_SEAM" -eq 0 ]; then
   pass "boot-source-size: COULD NOT CHECK — BOOT-CONTRACT R5 packet ceilings unreadable${BS_STD:+ at $BS_STD} (no built-in fallback, by design)"
 elif [ ! -d .git ]; then
   pass "boot-source-size: not a git repo — skipping"
 else
   bs_flagged=0
+  bs_accepted=0
   bs_cards=0
+  bs_worst=""
+  # ONE FINDING PER FILE IS THE RIGHT DETAIL AND THE WRONG PRE-COMMIT OUTPUT. Promoting
+  # this category to soft_fail put 57 warning lines in front of every planTheBeast commit
+  # and push — and this skill's own doc already names that failure mode ("saying the same
+  # thing eleven times is how a report becomes wallpaper"). A gate nobody reads is worth
+  # no more than the report-only one it replaced. So: --quiet (how every lefthook invokes
+  # it) collapses to ONE line naming the count and the three worst offenders; a bare run
+  # keeps the full per-file list. Same findings, same count, same exit code either way —
+  # only the rendering changes.
+  bs_emit() {  # $1 = full line, $2 = compact "NN% path"
+    if [ "$QUIET_OUTPUT" -eq 1 ]; then
+      bs_worst="${bs_worst}${2}"$'\n'
+    else
+      soft_fail "$1"
+    fi
+    bs_flagged=$((bs_flagged+1))
+  }
   while IFS= read -r wf; do
     [ -z "$wf" ] || [ ! -f "$wf" ] && continue
     bs_entries=$(awk '/^boot_path:/{f=1;next} f&&/^[[:space:]]*-[[:space:]]/{sub(/^[[:space:]]*-[[:space:]]*/,"");sub(/[[:space:]]*#.*/,"");print;next} f&&/^[^[:space:]#]/{f=0}' "$wf")
     [ -z "$bs_entries" ] && continue
     bs_cards=$((bs_cards+1))
+    # ACCEPTED-PARTIAL DECLARATIONS. Same extraction, but the trailing comment is
+    # KEPT — it carries the reason, and an exemption without a reason is not granted.
+    bs_partial=$(awk '/^boot_path_partial:/{f=1;next} f&&/^[[:space:]]*-[[:space:]]/{sub(/^[[:space:]]*-[[:space:]]*/,"");print;next} f&&/^[^[:space:]#]/{f=0}' "$wf")
     # Mirrors default_budget: an all-waystone boot_path is an INDEX card and gets 8
     # slots (breadth); anything else is a code seam and gets 4 (depth).
     bs_total=$(printf '%s\n' "$bs_entries" | grep -c .)
     bs_stones=$(printf '%s\n' "$bs_entries" | grep -cE "_waystone\.${AI_EXT_RE}$" || true)
     if [ "$bs_total" -eq "$bs_stones" ]; then bs_files="$BS_SLOTS_INDEX"; else bs_files="$BS_SLOTS_SEAM"; fi
-    bs_cap=$((BS_BUDGET / bs_files))
     bs_dir=$(dirname "$wf")
+
+    # R5 MUST: a card may not declare more entries than its slot count. `materialize.py`
+    # stops opening at max_files and everything after is never read — ABSENT, not
+    # truncated. Nothing gated this until v0.1.42, and three fleet cards violated it,
+    # one of them silently dropping a 66,778-char file its own risk block calls
+    # sync-critical. No boot_path_partial exemption: a partial read is a diminished
+    # promise, a dropped entry is a broken one, and the fix is always to shorten the list.
+    if [ "$bs_total" -gt "$bs_files" ]; then
+      bs_over=$(printf '%s\n' "$bs_entries" | grep . | tail -n +$((bs_files + 1)) | tr '\n' ' ')
+      bs_emit "boot-source-size: ${wf} declares ${bs_total} boot_path entries but only ${bs_files} slot(s) exist — R5 MUST NOT. These are NEVER opened: ${bs_over}— shorten boot_path; there is no exemption for an entry that does not arrive at all" "0% ${wf} ($((bs_total - bs_files)) entries dropped)"
+    fi
+
+    # SIMULATE THE REAL ALLOCATOR, do not divide. `BUDGET / slots` was this gate's model
+    # from v0.1.15 to v0.1.41 and it is the worst case, not the ceiling: the materializer
+    # re-computes `(remaining) // (remaining_slots)` at every entry, so anything under its
+    # share hands the surplus FORWARD. Measured cost of the old model: 18 fleet findings
+    # naming files as undeliverable that a boot delivers whole. Reference implementation
+    # and the wisl-preview validation: .repo-manager/boot-packet-sim.py.
+    bs_planned="$bs_total"; [ "$bs_planned" -gt "$bs_files" ] && bs_planned="$bs_files"
+    bs_used=0; bs_i=0
     while IFS= read -r e; do
       [ -z "$e" ] && continue
       bs_path="$e"; [ -f "$bs_path" ] || bs_path="${bs_dir}/${e}"
-      [ -f "$bs_path" ] || continue
-      bs_size=$(wc -c < "$bs_path" | tr -d ' ')
-      if [ "$bs_size" -gt "$bs_cap" ]; then
-        pass "boot-source-size: ${e} is ${bs_size} chars vs a ${bs_cap} cap — $(( bs_cap * 100 / bs_size ))% of it can EVER be delivered (declared by ${wf})"
-        bs_flagged=$((bs_flagged+1))
+      # A directory or a missing path contributes 0 chars AND STILL OCCUPIES ITS SLOT.
+      # Skipping those was how the old loop lost the surplus that decides everything.
+      if [ -f "$bs_path" ]; then bs_size=$(wc -m < "$bs_path" | tr -d ' '); else bs_size=0; fi
+      if [ "$bs_i" -ge "$bs_files" ]; then bs_i=$((bs_i+1)); continue; fi
+      bs_rem=$((BS_BUDGET - bs_used)); [ "$bs_rem" -lt 0 ] && bs_rem=0
+      bs_left=$((bs_planned - bs_i)); [ "$bs_left" -lt 1 ] && bs_left=1
+      bs_allowed=$((bs_rem / bs_left))
+      [ "$bs_allowed" -gt "$BS_MAXSRC" ] && bs_allowed="$BS_MAXSRC"
+      bs_got="$bs_size"; [ "$bs_got" -gt "$bs_allowed" ] && bs_got="$bs_allowed"
+      bs_used=$((bs_used + bs_got)); bs_i=$((bs_i+1))
+      [ "$bs_got" -ge "$bs_size" ] && continue
+      bs_pct=$(( bs_got * 100 / bs_size ))
+      # Is this entry declared as a deliberate partial read, and does it say why?
+      bs_decl=""
+      if [ -n "$bs_partial" ]; then
+        bs_decl=$(printf '%s\n' "$bs_partial" | awk -v want="$e" '
+          { line=$0; p=line; sub(/[[:space:]]*#.*/,"",p);
+            gsub(/^[[:space:]]+|[[:space:]]+$/,"",p);
+            if (p==want) { print line; exit } }')
+      fi
+      if [ -n "$bs_decl" ]; then
+        bs_reason=$(printf '%s\n' "$bs_decl" | sed -n 's/.*#[[:space:]]*//p')
+        if [ -n "$bs_reason" ]; then
+          # ACCEPTED. The percentage is still printed: an exemption may excuse the
+          # truncation, it does not get to hide what it costs.
+          pass "boot-source-size: ${e} delivers ${bs_pct}% (${bs_got} of ${bs_size} chars under this card's real allocation) — ACCEPTED partial by ${wf}: ${bs_reason}"
+          bs_accepted=$((bs_accepted+1))
+        else
+          bs_emit "boot-source-size: ${e} is declared in boot_path_partial by ${wf} with NO reason — an exemption with no stated reason is a silencer, not a decision; add \`# why\` or remove it (delivers ${bs_pct}%)" "${bs_pct}% ${e} (no reason given)"
+        fi
+      else
+        bs_emit "boot-source-size: ${e} is ${bs_size} chars and this card's allocation gives it ${bs_got} — only ${bs_pct}% arrives (declared by ${wf}); shrink the file, reorder boot_path so a smaller entry passes its surplus forward, or declare it under boot_path_partial with a reason" "${bs_pct}% ${e}"
       fi
     done < <(printf '%s\n' "$bs_entries")
   done < <(find . -type f -name "_waystone.${AI_EXT}" -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
   if [ "$bs_cards" -eq 0 ]; then
     pass "boot-source-size: no cards with a boot_path"
   elif [ "$bs_flagged" -eq 0 ]; then
-    pass "boot-source-size: every declared boot source fits its per-entry cap (${bs_cards} card(s))"
+    pass "boot-source-size: every oversized boot source is an accepted partial (${bs_accepted} accepted, ${bs_cards} card(s))"
+  elif [ "$QUIET_OUTPUT" -eq 1 ]; then
+    # The three worst by delivered share. `sort -u` first because one file can be
+    # declared by several cards (src/chloe/context/_waystone.chloeai is in both the
+    # cli card and the umbrella), and a top-3 that spends two slots on the same path
+    # is a shorter list, not a more useful one. Then numeric, so "9%" ranks below
+    # "12%" instead of above it the way a lexical sort would have it.
+    bs_top=$(printf '%s' "$bs_worst" | grep . | sort -u | sort -t'%' -k1 -n | head -3 | sed 's/^/    · /')
+    soft_fail "boot-source-size: ${bs_flagged} declared boot source(s) across ${bs_cards} card(s) can never arrive whole and no card has accepted that in writing (${bs_accepted} accepted). Worst:
+${bs_top}
+    Full list: bash .claude/skills/drift-sweep/sweep.sh  (without --quiet). Fix by shrinking the file, or declare it under boot_path_partial with a reason."
   else
-    pass "boot-source-size: ${bs_flagged} declared source(s) across ${bs_cards} card(s) can never arrive whole"
+    # NOT a `pass`, and it was one until v0.1.41. Every finding counted here has already
+    # printed as ✗/⚠ immediately above, so rendering the trailing count with a ✓ made the
+    # LAST line of a failing section green — and under --json emitted a "status":"pass"
+    # record for work that is not done. That is precisely the shape v0.1.40 set out to
+    # remove from this category, left standing in the branch nobody ran. Found by the
+    # negative control while arming the gate in MechaComet, not by reading. A bare
+    # informational line keeps the count without claiming anything about status.
+    [ "$JSON_OUTPUT" -eq 1 ] || echo "    ${bs_flagged} source(s) truncated with no accepted-partial declaration, ${bs_accepted} accepted, across ${bs_cards} card(s)"
   fi
 fi
 
@@ -2420,6 +2598,137 @@ else
   fi
 fi
 
+# ── 11a. HANDOFF block size (v0.1.43, soft_fail) ──────────────
+# THE RULE THAT HAD NO GATE. The HI Mode charter has said "keep a block under 4,096
+# bytes" since it was written, for a mechanical reason: a boot TAILS the carrier, so a
+# block that exceeds the tail window truncates its OWN OPENING — the zoom level, the
+# capability line, the reason. The most load-bearing lines in the file are the first
+# ones lost. Nothing checked it, and a block only had to be written once, oversized, to
+# hand the next session a headless block it could not tell was headless.
+#
+# THE BOUNDARY, DECIDED (SESSION-110k) BECAUSE AMBIGUITY WAS THE ACTUAL BLOCKER. This
+# was un-gateable for months not for want of ten lines of code but because "a block"
+# had two definitions: handoff_archive/INDEX.chloeai line 60 records SESSION-109-FORK
+# measured at 4,096 B one way and 4,077 B another, a 19-byte gap that is exactly the
+# trailing blank separator. A ceiling with two definitions passes or fails on who ran
+# it. The boundary is now: the `@YYYY-MM-DD|` HEADER LINE through the FINAL `signed=`
+# LINE, inclusive of both, EXCLUDING the trailing separator. That is what the tail
+# window actually has to carry, and it is the definition every measurement in
+# SESSION-110j/k/l used.
+#
+# THE PROXY, AND HOW IT PASSES FALSELY (charter rule for any new gate). The proxy is
+# BYTES BETWEEN TWO ANCHORS, and it is blind in three ways. (1) A block that never
+# writes `signed=` is not measured at all — it has no closing anchor, so an unsigned
+# block is invisible here rather than oversized; the wrap gates own that. (2) It counts
+# bytes, not delivery: the real tail window is set by the boot packet allocator, which
+# `boot-source-size` simulates — 4,096 is the charter's declared ceiling, not a
+# measurement of any particular boot. (3) It cannot see a block truncated BEFORE it was
+# written; it reads what landed on disk.
+CURRENT_CATEGORY="handoff-block-size"
+section "HANDOFF block size"
+_handoff_carrier() {
+  local c="${WRAP_CARRIER}"
+  if [ -z "$c" ]; then
+    if [ -f "readme_AI.${AI_EXT}" ]; then
+      c="readme_AI.${AI_EXT}"
+    elif [ -f ".claude/skills/hi-mode/HANDOFF_LOG.${AI_EXT}" ]; then
+      c=".claude/skills/hi-mode/HANDOFF_LOG.${AI_EXT}"
+    fi
+  fi
+  [ -n "$c" ] && [ -f "$c" ] && printf '%s' "$c"
+}
+# Emits one TSV row per block: <header>\t<bytes>. The boundary lives HERE and nowhere
+# else, so block-size and rotation can never disagree about what a block is.
+_handoff_blocks() {
+  awk '
+    /^@[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\|/ { inb=1; b=0; hdr=$0 }
+    inb { b += length($0) + 1 }
+    inb && /^signed=/ { printf "%s\t%d\n", hdr, b; inb=0 }
+  ' "$1"
+}
+hb_carrier=$(_handoff_carrier)
+if [ -z "$hb_carrier" ]; then
+  pass "handoff-block-size: no wrap carrier present (not adopted here)"
+else
+  hb_rows=$(_handoff_blocks "$hb_carrier")
+  if [ -z "$hb_rows" ]; then
+    # A carrier with no @date-anchored blocks uses a different continuity shape
+    # (prose, or a format this boundary does not describe). Saying nothing is the
+    # honest answer; inventing a boundary for it is how a gate starts measuring itself.
+    pass "handoff-block-size: ${hb_carrier} carries no @YYYY-MM-DD| HANDOFF blocks — different continuity shape, not measured"
+  else
+    hb_n=$(printf '%s\n' "$hb_rows" | grep -c .)
+    hb_over=0; hb_worst=""
+    while IFS=$'\t' read -r hb_hdr hb_bytes; do
+      [ -n "$hb_hdr" ] || continue
+      if [ "$hb_bytes" -gt "$HANDOFF_BLOCK_MAX_BYTES" ]; then
+        hb_over=$((hb_over+1))
+        hb_worst="${hb_worst}    ${hb_hdr} ${hb_bytes} B (+$((hb_bytes - HANDOFF_BLOCK_MAX_BYTES)) over)
+"
+      fi
+    done <<EOF
+$hb_rows
+EOF
+    if [ "$hb_over" -gt 0 ]; then
+      soft_fail "handoff-block-size: ${hb_over} of ${hb_n} block(s) in ${hb_carrier} exceed the ${HANDOFF_BLOCK_MAX_BYTES}-byte ceiling — a boot tails the file, so an oversized block truncates its OWN opening (zoom, capability, reason) first:
+$(printf '%s' "$hb_worst")"
+    else
+      hb_max=$(printf '%s\n' "$hb_rows" | awk -F'\t' 'BEGIN{m=0} $2>m{m=$2} END{print m+0}')
+      pass "handoff-block-size: ${hb_n} block(s) in ${hb_carrier}, largest ${hb_max} B ≤ ${HANDOFF_BLOCK_MAX_BYTES}"
+    fi
+  fi
+fi
+
+# ── 11b. HANDOFF rotation due (v0.1.43, soft_fail) ────────────
+# The charter's other unchecked rule: "rotate at ~5 sessions / ~25 KB".
+#
+# MEASURED ON LIVE BLOCK PAYLOAD, NOT FILE SIZE, and that is the whole design. The
+# carrier is not all payload: HANDOFF_LOG.chloeai opens with a 4,829-byte format header
+# — the rotation rule itself, the paging rationale, the block schema — which rotation
+# CANNOT remove, because it is the instructions for rotating. Sizing the file charges
+# that fixed 4.8 KB against a 25 KB budget, so a file-size trigger fires at 20.2 KB of
+# actual session record: it reports rotation due ~19% early, every time, forever.
+# Counting blocks between their own anchors makes the number mean what the rule says.
+#
+# (SESSION-110k asserted this header was ~12 KB AND that it grew per rotation. Measured
+# here: 4,829 B, byte-identical across the last five commits that touched the file. The
+# file that grows per rotation is handoff_archive/INDEX.chloeai — 17 KB, one line added
+# per rotation — which is a DIFFERENT FILE and is not on any boot path. Two files, one
+# claim. The conclusion survives the correction; its stated size and its direction did
+# not.)
+#
+# THE PROXY, AND HOW IT PASSES FALSELY. The proxy is VOLUME, and volume is not the
+# property that matters. What rotation protects is a bounded, readable working set; a
+# log of four enormous live blocks and a log of four closed ones measure the same here.
+# This gate therefore cannot tell a session that a block is READY to rotate — that
+# needs a closed-state on queue items, which the substrate does not record (SESSION-110k).
+# It is a volume alarm that says "triage is due", never "archive these".
+CURRENT_CATEGORY="handoff-rotation"
+section "HANDOFF rotation due"
+hr_carrier=$(_handoff_carrier)
+if [ -z "$hr_carrier" ]; then
+  pass "handoff-rotation: no wrap carrier present (not adopted here)"
+else
+  hr_rows=$(_handoff_blocks "$hr_carrier")
+  if [ -z "$hr_rows" ]; then
+    pass "handoff-rotation: ${hr_carrier} carries no @YYYY-MM-DD| HANDOFF blocks — not measured"
+  else
+    hr_n=$(printf '%s\n' "$hr_rows" | grep -c .)
+    hr_bytes=$(printf '%s\n' "$hr_rows" | awk -F'\t' '{t+=$2} END{print t+0}')
+    hr_why=""
+    [ "$hr_bytes" -gt "$HANDOFF_ROTATE_WARN_BYTES" ] && hr_why="${hr_bytes} B of live block payload (threshold ${HANDOFF_ROTATE_WARN_BYTES})"
+    if [ "$hr_n" -gt "$HANDOFF_ROTATE_WARN_BLOCKS" ]; then
+      [ -n "$hr_why" ] && hr_why="${hr_why} and "
+      hr_why="${hr_why}${hr_n} live blocks (threshold ${HANDOFF_ROTATE_WARN_BLOCKS})"
+    fi
+    if [ -n "$hr_why" ]; then
+      soft_fail "handoff-rotation: ${hr_carrier} carries ${hr_why} — rotation is a DEDICATED, byte-verified operation, never done in-wrap (the 2026-05-29 truncation came from exactly that). Triage which blocks still carry live items, archive the rest, add ONE index line."
+    else
+      pass "handoff-rotation: ${hr_carrier} at ${hr_n} block(s) / ${hr_bytes} B live payload — within ${HANDOFF_ROTATE_WARN_BLOCKS} / ${HANDOFF_ROTATE_WARN_BYTES}"
+    fi
+  fi
+fi
+
 # ── 12. WISL waystone graph connectivity ──────────────────────
 # For each _waystone.chloeai: every depends_on (a folder) and boot_path (a file or
 # dir) edge must resolve on disk. Self-propagation (WISL-STANDARD §design intent)
@@ -2502,6 +2811,395 @@ else
       pass "seam-coverage: no declared seams for ${repo_name} in the seam map"
     elif [ "$sc_missing" -eq 0 ]; then
       pass "seam-coverage: all ${sc_checked} declared seam(s) for ${repo_name} have waystones"
+    fi
+  fi
+fi
+
+# ── 13a. WISL partial seam declaration (v0.1.38, soft_fail) ───
+# THE HOLE SEAM-COVERAGE CANNOT SEE. Category 13 iterates the tsv and asks "does each
+# declared folder still have a card" — a DELETION detector. It is structurally incapable
+# of catching a folder that should have been declared and never was, because the only
+# folders it looks at are the ones somebody already wrote down. seam-coverage-definition
+# §1 says this in as many words; §4 declined to fix it because judging whether a folder
+# MERITS a seam needs a threshold nobody has data for.
+#
+# THIS CHECK NEVER JUDGES MERIT. It asks a different question that needs no threshold:
+# did someone declare SOME children of a parent and miss others? A fully-declared cohort
+# is complete. A fully-UNDECLARED cohort is a uniform decision — planTheBeast's twenty
+# tests/* packages are not twenty forgotten seams. Only a SPLIT cohort is evidence of an
+# omission, because somebody already decided this parent's children are worth declaring
+# and then stopped partway.
+#
+# THE PROXY, AND HOW IT PASSES FALSELY (charter rule for any new gate). The proxy is
+# SIBLING CONSISTENCY, not seam-worthiness. It is blind to a cohort that is uniformly
+# undeclared: if all 23 of src/chloe's children had been missing, this would say nothing
+# at all. It is therefore a RATCHET against drift from an established convention, not a
+# census of what deserves a card — ownership-coverage remains the coverage number per §4.
+#
+# Measured before arming, per §5: 6 findings fleet-wide (planTheBeast 4, TFNerd 2). Run
+# against the tsv as it stood before SESSION-105 it reports exactly the four folders that
+# had hidden from both existing gates, which is the counterfactual that earns it. UNARMED
+# (soft_fail): WARN unless --fail-on=seam-partial.
+CURRENT_CATEGORY="seam-partial"
+section "WISL partial seam declaration"
+if [ ! -d .git ]; then
+  pass "seam-partial: not a git repo — skipping"
+else
+  sp_top=$(git rev-parse --show-toplevel 2>/dev/null)
+  sp_tsv=""
+  for cand in \
+    "${sp_top:+${sp_top}/../.repo-manager/standards/WISL/seam-coverage.tsv}" \
+    "${HOME}/GitHub/.repo-manager/standards/WISL/seam-coverage.tsv"; do
+    [ -n "$cand" ] && [ -f "$cand" ] && { sp_tsv="$cand"; break; }
+  done
+  if [ -z "$sp_tsv" ]; then
+    pass "seam-partial: no workspace seam map reachable (single-repo checkout or not adopted)"
+  else
+    sp_repo=$(basename "${sp_top:-$(pwd)}")
+    sp_declared=$(awk -v r="$sp_repo" '$1==r && $1 !~ /^#/ {print $2}' "$sp_tsv" | sort -u)
+    if [ -z "$sp_declared" ]; then
+      pass "seam-partial: no declared seams for ${sp_repo} in the seam map"
+    else
+      sp_src=$(git ls-files 2>/dev/null \
+        | grep -Ev '(^|/)(node_modules|\.venv|venv|dist|build|vendor|\.generated|__pycache__)(/|$)' \
+        | grep -E '\.(ts|tsx|js|jsx|py|rs|go|swift|c|h|cpp|hpp)$')
+      sp_gaps=0
+      if [ -n "$sp_src" ]; then
+        while read -r sp_parent; do
+          [ -z "$sp_parent" ] && continue
+          sp_kids=$(printf '%s\n' "$sp_src" \
+            | awk -v p="${sp_parent}/" 'index($0,p)==1 {r=substr($0,length(p)+1); i=index(r,"/"); if(i>0) print p substr(r,1,i-1)}' \
+            | sort -u | grep -v '^$')
+          [ -z "$sp_kids" ] && continue
+          sp_n=$(printf '%s\n' "$sp_kids" | grep -c .)
+          sp_dec=0; sp_miss=""
+          while read -r sp_kid; do
+            if printf '%s\n' "$sp_declared" | grep -qx "$sp_kid"; then
+              sp_dec=$((sp_dec+1))
+            else
+              sp_miss="${sp_miss}${sp_kid}
+"
+            fi
+          done <<EOF
+$sp_kids
+EOF
+          # Split cohort only. 0 declared = a uniform decision; all declared = complete.
+          if [ "$sp_dec" -gt 0 ] && [ "$sp_dec" -lt "$sp_n" ]; then
+            while read -r sp_gap; do
+              [ -z "$sp_gap" ] && continue
+              soft_fail "seam-partial: ${sp_repo}/${sp_gap} has tracked source but no seam-map row, while ${sp_dec} of its ${sp_n} siblings under ${sp_parent} are declared"
+              sp_gaps=$((sp_gaps+1))
+            done <<EOF
+$sp_miss
+EOF
+          fi
+        done <<EOF
+$sp_declared
+EOF
+      fi
+      [ "$sp_gaps" -eq 0 ] && pass "seam-partial: no partially-declared parent folders in ${sp_repo}"
+    fi
+  fi
+fi
+
+# ── 13b. WISL route accuracy (v0.1.37, soft_fail) ─────────────
+# Does a question REACH the right card? Every other WISL category measures the page
+# table's shape; this one measures whether the router resolves through it.
+#
+# WHY IT IS NOT ARMED. planTheBeast is RED right now (4/9) and that is deliberate —
+# five cases encode real misses harvested from Wy's own question log on 2026-08-21.
+# Arming this today would block every commit in the only repo that measures anything,
+# which punishes the repo doing the work and rewards the ten that declare nothing.
+# WARN first, arm once the misses close: `--fail-on=route-accuracy`. Same
+# advisory-first rollout as seam-coverage and wrap-continuity.
+#
+# WHY AN UNMEASURED REPO WARNS INSTEAD OF PASSING. NOT MEASURED is not a pass — it is
+# the absence of evidence, and this whole gate family exists because absence of signal
+# kept getting read as health. seam-coverage, three categories up, passes when a repo
+# declares no seams; that is exactly how src/chloe/status, db, ingest and advisor sat
+# card-less and invisible until a live query failed to route on 2026-08-21. Do not copy
+# that shape here. The warn is restricted to repos that have actually adopted WISL (a
+# root card exists), so it nags the fleet it applies to and stays silent elsewhere.
+#
+# WHY IT REPORTS "COULD NOT CHECK". If the chloe CLI is unreachable — a single-repo CI
+# checkout, no venv, an import error — that is a DIFFERENT state from green and must
+# not print like one.
+CURRENT_CATEGORY="route-accuracy"
+section "WISL route accuracy"
+if [ ! -d .git ]; then
+  pass "route-accuracy: not a git repo — skipping"
+elif [ ! -f "_waystone.${AI_EXT}" ]; then
+  pass "route-accuracy: WISL not adopted here (no root card) — out of scope"
+elif [ ! -f "ai_context/route_cases.${AI_EXT}" ]; then
+  soft_fail "route-accuracy: no ai_context/route_cases.${AI_EXT} — routing accuracy is UNMEASURED here, which is not a pass; seed cases from questions someone actually asked"
+else
+  ra_repo=$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")
+  ra_cmd=""
+  if command -v chloe >/dev/null 2>&1; then
+    ra_cmd="chloe"
+  elif [ -x "${HOME}/GitHub/planTheBeast/.venv/bin/python" ]; then
+    ra_cmd="${HOME}/GitHub/planTheBeast/.venv/bin/python -m chloe.cli.main"
+  fi
+  if [ -z "$ra_cmd" ]; then
+    soft_fail "route-accuracy: COULD NOT CHECK — the chloe CLI is not reachable (no \`chloe\` on PATH, no planTheBeast venv). This repo declares route cases that nothing verified."
+  else
+    # COLOR OFF, AND STRIPPED ANYWAY. route-check renders through Rich, which decides
+    # whether to emit ANSI from the environment. Under a terminal that forces color on
+    # (FORCE_COLOR=3 — the default in several agent shells and CI images) the verdict
+    # arrives as "\033[31mFAIL\033[0m planTheBeast", the ^FAIL anchor below never
+    # matches, and this category silently degrades to COULD NOT CHECK: a warning that
+    # reads like an infrastructure hiccup while the gate is in fact measuring NOTHING.
+    # Found 2026-08-22 in the category's own output, three commits after it shipped.
+    #
+    # The env pin is the fix; the sed is the belt. Pinning alone would leave the gate
+    # one Rich release away from failing the same silent way, and a gate that stops
+    # measuring must not be able to do it quietly.
+    ra_out=$(NO_COLOR=1 FORCE_COLOR=0 CLICOLOR_FORCE=0 TERM=dumb \
+      _bounded 60 $ra_cmd route-check "$ra_repo" 2>&1)
+    ra_rc=$?
+    ra_out=$(printf '%s\n' "$ra_out" | sed -E 's/\x1b\[[0-9;]*[A-Za-z]//g')
+    ra_line=$(printf '%s\n' "$ra_out" | grep -E "^(PASS|FAIL|THIN|NOT MEASURED)[[:space:]]+${ra_repo}([[:space:]]|$)" | head -1)
+    if [ "$ra_rc" -eq 124 ]; then
+      soft_fail "route-accuracy: COULD NOT CHECK — route-check exceeded its 60s bound"
+    elif [ -z "$ra_line" ]; then
+      soft_fail "route-accuracy: COULD NOT CHECK — route-check returned no verdict line for ${ra_repo} (rc=${ra_rc})"
+    else
+      case "$ra_line" in
+        PASS*) pass "route-accuracy: ${ra_line}" ;;
+        *)     soft_fail "route-accuracy: ${ra_line} — run \`chloe route-check ${ra_repo}\` for the failing cases" ;;
+      esac
+    fi
+  fi
+fi
+
+# ── 13c. Dead config keys (v0.1.43, soft_fail, UNARMED) ───────
+# A CONSTANT THAT OUTLIVES ITS READER REPORTS CONFIDENTLY ABOUT NOTHING. Two model pins
+# did exactly that in one week (SESSION-110h): `configs/chloe.yaml` declared
+# `router.model_name` with NO reader anywhere in src/, and `cli/main.py`'s `_MODEL_ID`
+# reported cache state for a model `auto` may never load. NEITHER FAILED. Nothing was
+# broken, nothing was red — the config simply described a system that had moved, and
+# every human and agent reading it was reading fiction with a straight face. That is the
+# named fleet defect (A GATE IS NOT THE PROPERTY IT GUARDS) wearing config clothes.
+#
+# MECHANISM. For every leaf key in tracked configs/*.yaml — leaf meaning the line
+# carries a VALUE, since a parent key is usually reached as a dict — normalise the name
+# (lowercase, underscores removed) and ask whether that normalised identifier occurs
+# anywhere in the repo's tracked source outside configs/. Normalising is what makes one
+# comparison cover `model_name`, `modelName` and `MODEL_NAME` without three greps.
+#
+# THE PROXY, AND HOW IT PASSES FALSELY (charter rule for any new gate). The proxy is
+# NAME CO-OCCURRENCE, which is weaker than "is read" in both directions, and the
+# direction that matters is that IT OVER-REPORTS.
+#   · A key reached only by ITERATION (`for k, v in cfg["models"].items()`) has its
+#     name nowhere in src and will be flagged though it is read every run. This is the
+#     predicted dominant false positive and the reason the category ships UNARMED.
+#   · A key whose name collides with an unrelated identifier (`name`, `path`, `model`)
+#     passes on the collision alone. Short generic keys are therefore under-checked.
+#   · It never proves a hit is a READ — a key mentioned only in a comment or a log
+#     string passes.
+# So it is a LEAD GENERATOR, not a verdict: every finding needs a human read before
+# deletion. It ships soft_fail and UNARMED deliberately — one sweep to size the false
+# positives, per the arming discipline that v0.1.35 set (report-only is a holding
+# pattern, not a destination), and promotion is a separate, measured decision.
+CURRENT_CATEGORY="dead-config-key"
+section "Dead config keys"
+if [ ! -d .git ]; then
+  pass "dead-config-key: not a git repo — skipping"
+else
+  dck_cfgs=$(git ls-files 'configs/*.yaml' 'configs/*.yml' 2>/dev/null)
+  dck_src=$(git ls-files 2>/dev/null \
+    | grep -Ev '^configs/' \
+    | grep -Ev '(^|/)(node_modules|\.venv|venv|dist|build|vendor|\.generated|__pycache__)(/|$)' \
+    | grep -E '\.(py|ts|tsx|js|jsx|rs|go|swift|sh|c|h|cpp|hpp|m|kt|rb)$')
+  if [ -z "$dck_cfgs" ]; then
+    pass "dead-config-key: no tracked configs/*.yaml — not adopted here"
+  elif [ -z "$dck_src" ]; then
+    # Configs with no source to read them is a finding of a different kind, and
+    # claiming EVERY key is dead would be technically true and useless.
+    pass "dead-config-key: configs/ present but no tracked source outside it — nothing to compare against"
+  else
+    dck_tmp=$(mktemp -d)
+    # Identifier vocabulary of the source corpus, normalised the same way the keys are.
+    printf '%s\n' "$dck_src" | tr '\n' '\0' | xargs -0 cat 2>/dev/null \
+      | grep -oE '[A-Za-z_][A-Za-z0-9_]*' \
+      | tr 'A-Z' 'a-z' | tr -d '_' | sort -u > "${dck_tmp}/tokens"
+    : > "${dck_tmp}/keys"
+    while IFS= read -r dck_f; do
+      [ -n "$dck_f" ] || continue
+      awk -v f="$dck_f" '
+        {
+          line = $0
+          sub(/[[:space:]]+#.*$/, "", line)            # trailing comment is not a value
+          if (line ~ /^[[:space:]]*#/) next            # whole-line comment
+          if (line ~ /^[[:space:]]*-/) next            # list item, not a key
+          if (match(line, /^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*:/)) {
+            k = substr(line, RSTART, RLENGTH)
+            sub(/^[[:space:]]*/, "", k); sub(/:$/, "", k)
+            rest = substr(line, RSTART + RLENGTH)
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", rest)
+            if (rest != "") {                          # has a value ⇒ leaf
+              n = tolower(k); gsub(/_/, "", n)
+              printf "%s\t%s\t%s\n", n, k, f
+            }
+          }
+        }
+      ' "$dck_f" >> "${dck_tmp}/keys"
+    done <<EOF
+$dck_cfgs
+EOF
+    sort -u "${dck_tmp}/keys" -o "${dck_tmp}/keys"
+    cut -f1 "${dck_tmp}/keys" | sort -u > "${dck_tmp}/keynorm"
+    dck_total=$(grep -c . "${dck_tmp}/keynorm" || true)
+    comm -23 "${dck_tmp}/keynorm" "${dck_tmp}/tokens" > "${dck_tmp}/dead"
+    dck_dead=$(grep -c . "${dck_tmp}/dead" || true)
+    if [ "${dck_dead:-0}" -gt 0 ]; then
+      dck_list=""
+      dck_shown=0
+      while IFS= read -r dck_n; do
+        [ -n "$dck_n" ] || continue
+        dck_shown=$((dck_shown+1))
+        [ "$dck_shown" -gt 12 ] && continue
+        dck_row=$(awk -F'\t' -v n="$dck_n" '$1==n {print $3": "$2; exit}' "${dck_tmp}/keys")
+        dck_list="${dck_list}    ${dck_row}
+"
+      done < "${dck_tmp}/dead"
+      [ "$dck_dead" -gt 12 ] && dck_list="${dck_list}    … and $((dck_dead - 12)) more
+"
+      soft_fail "dead-config-key: ${dck_dead} of ${dck_total} leaf config key(s) have no matching identifier in tracked source — a pin that outlives its reader keeps reporting about nothing. LEADS, NOT VERDICTS: keys reached by iteration look identical to dead ones here.
+$(printf '%s' "$dck_list")"
+    else
+      pass "dead-config-key: all ${dck_total} leaf config key(s) have a matching identifier in source"
+    fi
+    rm -rf "$dck_tmp"
+  fi
+fi
+
+# ── 13d. Dev flags in always-on agents (v0.1.43, soft_fail) ───
+# `chloe start --headless` — auto-dispatch with NO confirmation step — ran as a KeepAlive
+# LaunchAgent for 70 days while the plist's OWN COMMENT said --headless is "acceptable
+# for single-user dev, NOT prod". The warning and the violation were four lines apart in
+# one file, and nothing read them together. Nothing dispatched unconfirmed only because
+# nothing was pushed to it; the safety was luck, not design.
+#
+# MECHANISM, AND WHY IT NEEDS NO JUDGEMENT OF ITS OWN. This gate has no opinion about
+# which flags are dangerous — an opinion needs a list, and a list goes stale. It fires
+# only where a plist is (a) always-on, meaning RunAtLoad or KeepAlive is true, AND (b)
+# passing an argument that a comment IN THAT SAME FILE flags as dev-only. The author
+# already wrote the verdict down; this only checks whether they then shipped against it.
+#
+# MENTION IS NOT USE, and this file has already paid for that lesson twice (see the
+# doc-version comment below: prose DESCRIBING a stale claim is not making one). The live
+# plist is the proof. SESSION-110h swapped `--headless` back to `--ntfy` and left a
+# comment that still NARRATES the old warning, quoting "--headless" and "NOT prod"
+# verbatim. A whole-file grep for both strings fires on it — and would be wrong, because
+# the flag is gone. So arguments are read from the COMMENT-STRIPPED body and warnings
+# from the comments, and only their INTERSECTION is a finding. Verified both ways: silent
+# on the fixed plist, and it fires when --ntfy is reverted to --headless.
+#
+# THE PROXY, AND HOW IT PASSES FALSELY. The proxy is SELF-DECLARED DANGER. It is blind
+# to every dev-only flag nobody wrote a warning about — which is most of them — and to
+# a warning phrased outside its vocabulary. It cannot be a census of unsafe daemons; it
+# is a ratchet that makes a documented warning binding on the file that carries it.
+CURRENT_CATEGORY="dev-flag-always-on"
+section "Dev flags in always-on agents"
+if [ ! -d .git ]; then
+  pass "dev-flag-always-on: not a git repo — skipping"
+else
+  dfa_plists=$(git ls-files '*.plist' 2>/dev/null)
+  if [ -z "$dfa_plists" ]; then
+    pass "dev-flag-always-on: no tracked *.plist — no launchd agents defined here"
+  else
+    dfa_n=0; dfa_hits=0; dfa_report=""
+    while IFS= read -r dfa_p; do
+      [ -n "$dfa_p" ] || continue
+      [ -f "$dfa_p" ] || continue
+      # Body with every XML comment removed, and the comments alone, one per line.
+      dfa_body=$(awk '
+        { line = $0; out = ""
+          while (1) {
+            if (!inc) {
+              i = index(line, "<!--")
+              if (i == 0) { out = out line; break }
+              out = out substr(line, 1, i-1); line = substr(line, i+4); inc = 1
+            } else {
+              j = index(line, "-->")
+              if (j == 0) break
+              inc = 0; line = substr(line, j+3)
+            }
+          }
+          print out }
+      ' "$dfa_p")
+      dfa_comments=$(awk '
+        { line = $0
+          while (1) {
+            if (!inc) {
+              i = index(line, "<!--")
+              if (i == 0) break
+              line = substr(line, i+4); inc = 1; buf = ""
+            } else {
+              j = index(line, "-->")
+              if (j == 0) { buf = buf " " line; break }
+              buf = buf " " substr(line, 1, j-1)
+              print buf
+              inc = 0; buf = ""; line = substr(line, j+3)
+            }
+          }
+        }
+      ' "$dfa_p")
+      # Always-on? RunAtLoad or KeepAlive true, read from the comment-free body.
+      dfa_always=$(printf '%s\n' "$dfa_body" | awk '
+        /<key>(RunAtLoad|KeepAlive)<\/key>/ { look = 1; next }
+        look && /[^[:space:]]/ { if ($0 ~ /<true\/>/) { print "true"; exit } ; look = 0 }
+      ')
+      [ "$dfa_always" = "true" ] || continue
+      dfa_n=$((dfa_n+1))
+      dfa_args=$(printf '%s\n' "$dfa_body" | awk '
+        /<key>ProgramArguments<\/key>/ { want = 1; next }
+        want && /<array>/ { ina = 1; want = 0 }
+        ina && /<\/array>/ { ina = 0; next }
+        ina { s = $0
+              while (match(s, /<string>[^<]*<\/string>/)) {
+                print substr(s, RSTART + 8, RLENGTH - 17)
+                s = substr(s, RSTART + RLENGTH)
+              } }
+      ' | grep '^-' || true)
+      [ -n "$dfa_args" ] || continue
+      # SENTENCES, NOT COMMENTS, and the vocabulary is a PROD VERDICT — both learned
+      # from this very file. At comment granularity the live plist's one long
+      # SESSION-110h note counts as a single record, so `--ntfy` (named while
+      # DESCRIBING the fix) shares a record with "NOT prod" (written about the flag
+      # that was REMOVED) and the gate fires on the fix. And a vocabulary containing
+      # bare `dev` or `dev-mode` matches that same note's prose. What the author
+      # actually writes when they mean it is a verdict about PROD.
+      dfa_warns=$(printf '%s\n' "$dfa_comments" | sed -E 's/([.;!?]) +/\1\n/g' \
+        | grep -Ei 'not prod|non-prod|not for prod|not production|dev only|dev-only|debug only|debug-only|do not ship|temporary' || true)
+      [ -n "$dfa_warns" ] || continue
+      while IFS= read -r dfa_flag; do
+        [ -n "$dfa_flag" ] || continue
+        # TOKEN, NOT SUBSTRING. `grep -F -- -m` matches inside "dev-mode"; the python
+        # module flag then reads as a flag the author warned about. `-` is inside the
+        # boundary class because a flag is delimited by whitespace, not by hyphens.
+        dfa_re=$(_ere_escape "$dfa_flag")
+        dfa_line=$(printf '%s\n' "$dfa_warns" \
+          | grep -E -- "(^|[^A-Za-z0-9_-])${dfa_re}([^A-Za-z0-9_-]|$)" | head -1 || true)
+        [ -n "$dfa_line" ] || continue
+        dfa_hits=$((dfa_hits+1))
+        dfa_quote=$(printf '%s' "$dfa_line" | tr -s ' ' | cut -c1-160)
+        dfa_report="${dfa_report}    ${dfa_p} passes ${dfa_flag} while its own comment says: ${dfa_quote}
+"
+      done <<EOF
+$dfa_args
+EOF
+    done <<EOF
+$dfa_plists
+EOF
+    if [ "$dfa_hits" -gt 0 ]; then
+      soft_fail "dev-flag-always-on: ${dfa_hits} argument(s) that a plist's own comment calls dev-only are being passed by an always-on (RunAtLoad/KeepAlive) agent — an always-on agent IS prod, so a flag that survives into one has stopped being dev mode:
+$(printf '%s' "$dfa_report")"
+    elif [ "$dfa_n" -eq 0 ]; then
+      pass "dev-flag-always-on: no tracked plist is always-on (RunAtLoad/KeepAlive)"
+    else
+      pass "dev-flag-always-on: ${dfa_n} always-on agent(s), none passing an argument their own comments flag as dev-only"
     fi
   fi
 fi
