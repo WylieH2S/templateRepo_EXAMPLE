@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.43 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.44 — detect code/substrate drift in a repo.
+#
+# v0.1.44 (SESSION-111, 2026-08-26): `tier1-bloat` had TWO thresholds and neither was
+#   derived; both were measurably naming the wrong thing. The per-file 25 KB was picked
+#   as "much smaller than the 127 KB charter" and contradicted the ~4,096-char per-entry
+#   share a boot actually allocates — a 6x disagreement that let a 17 KB always-loaded
+#   doc pass green while delivering 23% of itself. Measured fleet-wide it flagged ONE
+#   file of 42, and that one is on no boot path, i.e. the one case where truncation is
+#   not the concern. The cap is now DERIVED from the aggregate (TIER1_FILE_SHARE_PCT of
+#   the budget) so it moves when the budget moves. The aggregate counted LINES, and
+#   chars-per-line runs 39-77 across this substrate: under the 750-line budget Planitaria
+#   (702 lines / 30,657 chars) was named the repo with work to do while planTheBeast
+#   (654 lines / 50,381 chars) passed carrying 64% MORE CHARACTERS. Chars now — the same
+#   unit the boot allocator uses — calibrated as 750 was, above the second-highest repo
+#   and below the highest. TIER1_BLOAT_WARN_KB and TIER1_AGGREGATE_WARN_LINES are retired,
+#   and setting the latter WARNS rather than being silently ignored.
+#   New `tier1-carrier-partial`: a Tier-1 CARRIER (STARTUP_AI / readme_AI / CLAUDE.md)
+#   declared an accepted boot partial. "The rest is found by grep" is a sound exemption
+#   for a spec and a bad one for the file holding the latest HANDOFF — OperationFarmstock's
+#   readme_AI delivers 54% and was ✓ in BOTH size gates. 2 findings fleet-wide.
 #
 # v0.1.43 (SESSION-111, 2026-08-25): four rules that had been WRITTEN DOWN AND NEVER
 #   CHECKED get gates. `handoff-block-size` and `handoff-rotation` enforce the two
@@ -624,8 +643,14 @@
 #   BACKSTOP_CHECK            — set 0 to skip the one network probe entirely (default 1)
 #   SOURCE_EXTENSIONS         — file extensions to treat as source (default "ts tsx js py rs go swift")
 #   TIER1_FILES               — space-separated always-loaded substrate files to size-check
-#   TIER1_BLOAT_WARN_KB       — always-loaded PER-FILE size WARN threshold in KB (default 25)
-#   TIER1_AGGREGATE_WARN_LINES — always-loaded TOTAL line budget (default 750, soft_fail)
+#   TIER1_AGGREGATE_WARN_CHARS — always-loaded TOTAL char budget (default 40000, soft_fail).
+#                               CHARS, not lines: chars-per-line runs 39-77 across this
+#                               substrate, so a line budget names the wrong repo.
+#   TIER1_FILE_SHARE_PCT      — max %% of that budget ONE always-loaded file may take
+#                               (default 40). The per-file cap is DERIVED from the
+#                               aggregate; it is not an independent constant.
+#   TIER1_BLOAT_WARN_KB / TIER1_AGGREGATE_WARN_LINES — RETIRED in v0.1.44. Setting the
+#                               line budget warns rather than being silently ignored.
 #   AGENTS_LAG_WARN_DAYS      — days AGENTS.md may trail CLAUDE.md (default 30, soft_fail)
 #   OWNERSHIP_COVERAGE_MIN_PCT — min %% of source files claimed by a card's owns (default 80)
 #   VALIDATION_AGE_WARN_DAYS  — days a card's validation: may go unproven (default 30)
@@ -796,8 +821,8 @@ BACKSTOP_WORKFLOW="${BACKSTOP_WORKFLOW:-fleet-sweep.yml}"
 BACKSTOP_STALE_DAYS="${BACKSTOP_STALE_DAYS:-2}"
 BACKSTOP_CHECK="${BACKSTOP_CHECK:-1}"
 SOURCE_EXTENSIONS="${SOURCE_EXTENSIONS:-ts tsx js py rs go swift}"
-TIER1_BLOAT_WARN_KB="${TIER1_BLOAT_WARN_KB:-25}"
-TIER1_AGGREGATE_WARN_LINES="${TIER1_AGGREGATE_WARN_LINES:-750}"
+TIER1_AGGREGATE_WARN_CHARS="${TIER1_AGGREGATE_WARN_CHARS:-40000}"
+TIER1_FILE_SHARE_PCT="${TIER1_FILE_SHARE_PCT:-40}"
 AGENTS_LAG_WARN_DAYS="${AGENTS_LAG_WARN_DAYS:-30}"
 OWNERSHIP_COVERAGE_MIN_PCT="${OWNERSHIP_COVERAGE_MIN_PCT:-80}"
 VALIDATION_AGE_WARN_DAYS="${VALIDATION_AGE_WARN_DAYS:-30}"
@@ -1696,49 +1721,140 @@ else
 fi
 
 # ── 8. Always-loaded (Tier 1) substrate bloat ─────────────────
-# Advisory only (warn). Enforces ADR-004 paging discipline: files loaded on
-# every boot must stay lean; session/decision history pages out to on-demand
-# archives. A growing always-loaded file is the charter-127KB pattern recurring.
+# Enforces ADR-004 paging discipline: files loaded on every boot stay lean, and
+# session/decision history pages out to on-demand archives. A growing always-loaded file
+# is the charter-127KB pattern recurring.
+#
+# v0.1.44 REPLACED BOTH THRESHOLDS, because both were proxies nobody had derived and each
+# was measurably naming the wrong thing.
+#
+# (1) THE PER-FILE 25 KB WAS INVENTED, AND IT CONTRADICTED A GATE THAT WAS RIGHT. It was
+#     picked as "much smaller than the 127 KB charter", never derived. Meanwhile the
+#     per-entry share a boot actually allocates is ~4,096 chars — the two disagreed by
+#     6x, so a 17 KB always-loaded doc passed this check green while delivering 23% of
+#     itself forever (PocketLink's CURRENT_MISSION.md, found that way). Measured across
+#     the fleet 2026-08-26, 25 KB flagged exactly ONE file of 42 — and that one is not on
+#     any boot path, i.e. the single case where truncation is NOT the concern.
+#     The cap is now DERIVED FROM THE AGGREGATE: no single always-loaded file may take
+#     more than TIER1_FILE_SHARE_PCT of the whole always-loaded budget. It moves when the
+#     budget moves, which an invented constant cannot.
+#
+# (2) THE AGGREGATE COUNTED LINES, AND LINES ARE NOT A UNIT OF COST. Measured fleet-wide,
+#     chars-per-line runs 39 to 77 — nearly 2x — because this substrate uses long prose
+#     lines. The consequence is not theoretical: under the 750-LINE budget, Planitaria
+#     (702 lines / 30,657 chars) was named "the one repo with real work to do" while
+#     planTheBeast (654 lines / 50,381 chars) passed carrying 64% MORE CHARACTERS. The
+#     budget named the wrong repo. It also let a 27 KB file through, since few long lines
+#     cost little in the unit being measured. Chars now, and the boot allocator itself
+#     works in chars, so the gate and the thing it guards finally share a unit.
+#
+# 40,000 is calibrated from measured reality exactly as 750 was — above the second-highest
+# repo (OperationFarmstock 38,336) and below the highest (planTheBeast 50,381), so one
+# repo has real work and the gate is a ratchet for the other ten. Same shape as the old
+# calibration, correct unit.
+#
+# THE PROXY, AND HOW IT PASSES FALSELY. The proxy is SIZE OF A FIXED FILE LIST. It is
+# blind to anything not in TIER1_FILES — a repo can move weight into a file nobody listed
+# and pass — and it says nothing about whether the content EARNS its place, which is the
+# question that actually matters and needs a reader. soft_fail, armable via
+# --fail-on=tier1-bloat.
 CURRENT_CATEGORY="tier1-bloat"
 section "Always-loaded substrate bloat"
+if [ -n "${TIER1_AGGREGATE_WARN_LINES:-}" ]; then
+  # A retired setting that is silently ignored is its own defect class — the config
+  # says one thing and the gate does another, which is what this whole category is about.
+  warn "tier1-bloat: TIER1_AGGREGATE_WARN_LINES is RETIRED (v0.1.44) and is being ignored — the aggregate is measured in CHARS now, because chars-per-line varies ~2x across this substrate and the line budget named the wrong repo. Set TIER1_AGGREGATE_WARN_CHARS instead."
+fi
 tier1_bloat_hits=0
-tier1_total_lines=0
+tier1_total_chars=0
 tier1_present=0
-warn_bytes=$((TIER1_BLOAT_WARN_KB * 1024))
+tier1_file_cap=$(( TIER1_AGGREGATE_WARN_CHARS * TIER1_FILE_SHARE_PCT / 100 ))
 for sub in $TIER1_FILES; do
   [ -f "$sub" ] || continue
   tier1_present=$((tier1_present+1))
-  tier1_total_lines=$((tier1_total_lines + $(wc -l < "$sub" 2>/dev/null | tr -d ' ')))
-  sz=$(wc -c < "$sub" 2>/dev/null | tr -d ' ')
-  if [ "$sz" -gt "$warn_bytes" ]; then
-    warn "tier1 bloat: ${sub} is $((sz / 1024)) KB (>${TIER1_BLOAT_WARN_KB} KB) — page history out to an on-demand archive (ADR-004)"
+  sz=$(wc -m < "$sub" 2>/dev/null | tr -d ' ')
+  tier1_total_chars=$((tier1_total_chars + sz))
+  if [ "$sz" -gt "$tier1_file_cap" ]; then
+    soft_fail "tier1-bloat: ${sub} is ${sz} chars — over ${tier1_file_cap}, which is ${TIER1_FILE_SHARE_PCT}% of the ${TIER1_AGGREGATE_WARN_CHARS}-char always-loaded budget. One file should not own the boot. Page history out to an on-demand archive (ADR-004); if it is also a declared boot source, boot-source-size says how much of it actually arrives."
     tier1_bloat_hits=$((tier1_bloat_hits+1))
   fi
 done
-[ "$tier1_bloat_hits" -eq 0 ] && pass "no always-loaded substrate files over ${TIER1_BLOAT_WARN_KB} KB"
+[ "$tier1_bloat_hits" -eq 0 ] && [ "$tier1_present" -gt 0 ] && pass "tier1-bloat: no always-loaded file over ${tier1_file_cap} chars (${TIER1_FILE_SHARE_PCT}% of the budget)"
 
-# THE AGGREGATE, which is the number the charter always stated and NOTHING ever
-# checked. LOAD ECONOMICS said "<=200 lines total across all Tier 1 files"; the
-# only mechanism was the per-file KB check above, so six repos ran at 313-796
-# lines and every one of them passed. A budget with no mechanism is a wish, and
-# this fleet has now paid for that lesson often enough to stop writing them.
-#
-# 750 is calibrated from measured reality rather than aspiration (union set,
-# 2026-08-16: Planitaria 796, planTheBeast 749, TFNerd 591, PocketLink 588,
-# OperationFarmstock 557, r1Intern 495, ADTNode 489, HomeImprovement 467,
-# Task-Force-Nerd-LLC 456, MechaComet 399). It makes Planitaria the one repo with
-# real work to do and turns the gate into a ratchet against future creep for
-# everyone else.
-#
-# soft_fail, not fail: WARN by default, FAIL via --fail-on=tier1-bloat. Arming
-# straight to FAIL would break Planitaria's next pre-commit on a repo whose only
-# offence is being slightly over a budget invented today. Advisory-first is this
-# fleet's documented rollout and it is not negotiable for a brand-new threshold.
 if [ "$tier1_present" -gt 0 ]; then
-  if [ "$tier1_total_lines" -gt "$TIER1_AGGREGATE_WARN_LINES" ]; then
-    soft_fail "tier1 aggregate: ${tier1_total_lines} lines across ${tier1_present} always-loaded file(s), over the ${TIER1_AGGREGATE_WARN_LINES}-line budget — page reference material to an on-demand Tier 2 file (ADR-004)"
+  if [ "$tier1_total_chars" -gt "$TIER1_AGGREGATE_WARN_CHARS" ]; then
+    soft_fail "tier1 aggregate: ${tier1_total_chars} chars across ${tier1_present} always-loaded file(s), over the ${TIER1_AGGREGATE_WARN_CHARS}-char budget — page reference material to an on-demand Tier 2 file (ADR-004)"
   else
-    pass "tier1 aggregate: ${tier1_total_lines} lines across ${tier1_present} always-loaded file(s), within the ${TIER1_AGGREGATE_WARN_LINES}-line budget"
+    pass "tier1 aggregate: ${tier1_total_chars} chars across ${tier1_present} always-loaded file(s), within the ${TIER1_AGGREGATE_WARN_CHARS}-char budget"
+  fi
+fi
+
+# ── 8a. A Tier-1 CARRIER may not be an accepted boot partial (v0.1.44) ────────
+# THE HOLE THAT PASSED BOTH SIZE GATES GREEN. boot-source-size lets a card ACCEPT that a
+# declared source arrives truncated, via `boot_path_partial:` with a written reason, and
+# the reason is nearly always some form of "declared for orientation; the rest is found by
+# grep, not by boot". For a spec or a reference doc that is a sound decision — the whole
+# point of the accepted cohort.
+#
+# It is NOT a sound decision for a CARRIER. OperationFarmstock's readme_AI.chloeai is an
+# accepted partial delivering 54%, and readme_AI is the file holding the latest HANDOFF
+# block: "found by grep" assumes a reader who knows to go looking, which is exactly what a
+# session resuming cold does not know. Truncating a spec costs a lookup; truncating the
+# continuity carrier costs the thing the boot exists to deliver. Both were ✓ — one because
+# the exemption was declared, the other (tier1-bloat) because 12,964 < 25 KB.
+#
+# So the exemption keeps its meaning everywhere EXCEPT the three files a boot enters
+# through. This does not re-litigate boot-source-size's verdict; it says the accepted
+# cohort has one membership rule it was missing.
+#
+# THE PROXY, AND HOW IT PASSES FALSELY. The proxy is FILENAME. A repo that carries its
+# continuity in a differently-named file is invisible here, and a carrier that truncates
+# WITHOUT declaring an exemption is boot-source-size's finding, not this one — this fires
+# only on the declared-and-accepted case. 2 findings fleet-wide at introduction.
+CURRENT_CATEGORY="tier1-carrier-partial"
+section "Tier-1 carrier accepted as a boot partial"
+if [ -z "$AI_EXT" ]; then
+  pass "tier1-carrier-partial: no AI carrier resolved — skipping"
+else
+  t1c_carriers="STARTUP_AI.${AI_EXT} readme_AI.${AI_EXT} CLAUDE.md"
+  t1c_hits=0; t1c_cards=0
+  while IFS= read -r t1c_card; do
+    [ -n "$t1c_card" ] || continue
+    t1c_dir=$(dirname "$t1c_card"); t1c_dir=${t1c_dir#./}
+    [ "$t1c_dir" = "." ] && t1c_dir=""
+    t1c_cards=$((t1c_cards+1))
+    # Entries under boot_path_partial:, resolved RELATIVE TO THE CARD'S FOLDER — a nested
+    # card accepting its own local CLAUDE.md is not accepting the repo's Tier-1 one.
+    t1c_entries=$(awk '
+      /^boot_path_partial:[[:space:]]*$/ { p=1; next }
+      /^[A-Za-z_][A-Za-z0-9_]*:/ { p=0 }
+      p && /^[[:space:]]*-[[:space:]]/ {
+        line=$0; sub(/^[[:space:]]*-[[:space:]]*/, "", line)
+        sub(/[[:space:]]*#.*$/, "", line); gsub(/"/, "", line)
+        gsub(/[[:space:]]+$/, "", line)
+        if (line != "") print line
+      }
+    ' "$t1c_card" 2>/dev/null)
+    [ -n "$t1c_entries" ] || continue
+    while IFS= read -r t1c_e; do
+      [ -n "$t1c_e" ] || continue
+      t1c_path="${t1c_dir:+${t1c_dir}/}${t1c_e}"
+      for t1c_name in $t1c_carriers; do
+        [ "$t1c_path" = "$t1c_name" ] || continue
+        [ -f "$t1c_path" ] || continue
+        soft_fail "tier1-carrier-partial: ${t1c_path} is declared an ACCEPTED boot partial by ${t1c_card#./}, but it is a Tier-1 CARRIER — a boot enters through it. 'The rest is found by grep' assumes a reader who knows to look, which is precisely what a cold session does not. Shrink the carrier or move the accepted content behind it; do not exempt the entry point."
+        t1c_hits=$((t1c_hits+1))
+      done
+    done <<EOF
+$t1c_entries
+EOF
+  done <<EOF
+$(find . -name "_waystone.${AI_EXT}" -not -path "*/node_modules/*" -not -path "*/.venv/*" 2>/dev/null)
+EOF
+  if [ "$t1c_cards" -eq 0 ]; then
+    pass "tier1-carrier-partial: no waystone cards — WISL not adopted here"
+  elif [ "$t1c_hits" -eq 0 ]; then
+    pass "tier1-carrier-partial: no Tier-1 carrier is declared an accepted boot partial (${t1c_cards} card(s))"
   fi
 fi
 
