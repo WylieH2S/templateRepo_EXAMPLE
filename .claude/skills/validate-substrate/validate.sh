@@ -466,8 +466,25 @@ ninety_days_ago=$(date -v-90d +%s 2>/dev/null || date -d "90 days ago" +%s)
 
 for f in ai_context/current_state.md "AI_HANDOFF.${AI_EXT}" "readme_AI.${AI_EXT}"; do
   if [ -f "$f" ]; then
-    mtime=$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)
-    if [ "$mtime" -lt "$ninety_days_ago" ]; then
+    # GNU form FIRST, and VALIDATE each candidate as an integer. The load-bearing
+    # part is the validation, not the order: `stat -f %m` on GNU prints a whole
+    # filesystem block to STDOUT and *then* exits non-zero, so `$(A || B)` captures
+    # BOTH outputs concatenated. The old line here did exactly that: `mtime` became
+    # multi-line garbage, `[ "$mtime" -lt ... ]` died with "integer expected", the
+    # if-test returned non-zero, control fell to `else`, and this gate printed
+    # "✓ fresh" for EVERY file on EVERY Linux host regardless of age. A staleness
+    # check that could never report stale. Measured 2026-08-28, not inferred.
+    # This is the UNFIXED TWIN of drift-sweep's v0.1.23 `_mtime` fix — same defect,
+    # same repo, and the fix reached only one copy for months.
+    mtime=$(stat -c %Y "$f" 2>/dev/null) || mtime=""
+    case "$mtime" in ''|*[!0-9]*) mtime="" ;; esac
+    if [ -z "$mtime" ]; then
+      mtime=$(stat -f %m "$f" 2>/dev/null) || mtime=""
+      case "$mtime" in ''|*[!0-9]*) mtime="" ;; esac
+    fi
+    if [ -z "$mtime" ]; then
+      warn "$f — could not read mtime on this platform; freshness UNMEASURED (not a pass)"
+    elif [ "$mtime" -lt "$ninety_days_ago" ]; then
       warn "$f not touched in >90 days"
     else
       pass "$f fresh"
