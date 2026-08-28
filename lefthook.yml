@@ -78,18 +78,43 @@ pre-push:
     # does NOT skip pre-push, so a locally-bypassed commit is still caught before it
     # reaches origin — the exact DEC-103 pattern. Closes SL-001 residual #1, open
     # since June: "the arm is pre-commit only, with no push-time backstop".
-    # Honest limit: `git push --no-verify` still skips this. The nightly fleet-sweep
-    # in repoManager is what catches a determined bypass.
+    # Honest limit: `git push --no-verify` still skips this, AND NOTHING CATCHES IT.
+    # This comment used to name "the nightly fleet-sweep in repoManager" as the
+    # backstop for a determined bypass. Checked 2026-08-28: no systemd timer, no
+    # cron entry and no unit file for such a sweep exists on the Linux host, and on
+    # the Mac the scan LaunchAgent is deliberately unloaded. The backstop runs
+    # nowhere. Do not read a green push as evidence the substrate is clean; if a
+    # real backstop is wanted, it has to be built (docket D-17).
     drift-sweep-push:
       run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,waystone-freshness,wrap-continuity
-    # Prevent force-pushes to main/master without explicit ack
-    no-force-push-main:
+    # Block a push that would DISCARD commits the remote already has.
+    #
+    # REPLACES `no-force-push-main`, which was named for a guarantee it did not
+    # provide: its body was `echo "ℹ Pushing to $branch"` and it blocked nothing.
+    # It could not have worked in any form — it read the pre-push ref from "$1",
+    # and lefthook forwards NEITHER args NOR stdin to commands (verified against
+    # lefthook 2026-08-28 with a probe command: both empty). So it never even saw
+    # the refs it claimed to judge. Anyone reading this file believed force-pushes
+    # to main were prevented for as long as it sat here.
+    #
+    # THE PROXY: this asks the remote (a fetch) instead of trusting the local
+    # remote-tracking cache, which goes stale exactly when a second host pushes —
+    # the case that matters. HOW IT PASSES FALSELY: `git push --no-verify` skips
+    # every hook here, and a fetch failure is treated as "cannot tell" and allowed
+    # through rather than blocking work on a flaky network.
+    no-clobber-remote:
       run: |
-        remote_ref="$1"
-        local_ref="$2"
-        branch=$(git rev-parse --abbrev-ref HEAD)
-        if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
-          # Caller is responsible for explicit force-push intent.
-          # This hook just notes the action.
-          echo "ℹ Pushing to $branch"
+        br=$(git rev-parse --abbrev-ref HEAD)
+        up=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) || exit 0
+        git fetch --quiet origin "$br" 2>/dev/null || true
+        behind=$(git rev-list --count "HEAD..$up" 2>/dev/null || echo 0)
+        if [ "${behind:-0}" -gt 0 ]; then
+          echo "✗ $up has $behind commit(s) this clone does not have."
+          echo "  A force-push here DISCARDS them. Integrate first: git pull --rebase"
+          if [ "${ALLOW_FORCE_PUSH:-0}" = "1" ]; then
+            echo "  → ALLOW_FORCE_PUSH=1 set; proceeding on explicit intent."
+          else
+            echo "  Override deliberately with: ALLOW_FORCE_PUSH=1 git push --force ..."
+            exit 1
+          fi
         fi
