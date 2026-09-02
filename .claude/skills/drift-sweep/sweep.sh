@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.45 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.46 — detect code/substrate drift in a repo.
+#
+# v0.1.46 (SESSION-118, 2026-09-02): new `plan-uncaptured` (soft_fail, UNARMED). D-27
+#   symlinked ~/.claude/plans into .repo-manager/plans/raw/<host>/ so plans land in git
+#   as they are written; this checks every raw file is TRACKED and has a row in
+#   INDEX.chloeai. A symlink makes plans trackable, and "trackable but nobody looked"
+#   is the whole failure — two planTheBeast plans were cited by seven files for weeks
+#   after they ceased to exist. Proxy: PRESENCE of a row, never correctness; blind to a
+#   row that lies and to a host that never syncs. `untracked-docs` does not match
+#   "plan", so an untracked plan is invisible to every other gate here.
 #
 # v0.1.45 (SESSION-111, 2026-08-26): new `journal-order`. An entry filed at the wrong end
 #   of a journal is invisible, and a CORRECTION filed there is worse than none. On
@@ -3307,6 +3316,65 @@ fi
 # to every dev-only flag nobody wrote a warning about — which is most of them — and to
 # a warning phrased outside its vocabulary. It cannot be a census of unsafe daemons; it
 # is a ratchet that makes a documented warning binding on the file that carries it.
+# ── Plan capture (v0.1.46, soft_fail, UNARMED) ────────────────
+# A PLAN THAT SURVIVES IS NOT A PLAN THAT CAN BE FOUND, and those are different
+# properties. `~/.claude/plans/` is machine-local, outside every repo, shared by every
+# project on a host, and rotated by Claude Code under auto-generated names. Two
+# planTheBeast plans died there — the v3-v11 master roadmap and the v1 build plan —
+# VERIFIED LOST from both hosts 2026-09-01 while SEVEN files still cited them as the
+# scope of record. The question "is Chloe finished?" had no readable definition of done.
+#
+# D-27 symlinked that directory into `.repo-manager/plans/raw/<host>/` so plans land in
+# git as they are written. This is the third part: the symlink makes them TRACKABLE, and
+# "trackable but nobody looked" is the whole failure. A file in raw/ with no row in
+# INDEX.chloeai is captured-but-unfindable — the ambiguity that cost the 2026-08-22 WISL
+# plan, recovered by hand at 2647951 only because someone happened to look.
+#
+# THE PROXY, AND HOW IT PASSES FALSELY (charter rule for any new gate). The proxy is
+# PRESENCE OF A ROW, never correctness of the capture. Blind three ways: (1) a row that
+# LIES — wrong disposition, a DERIVED-> path that does not exist, a sha256 that no longer
+# matches — reads exactly like a true one here; (2) a HOST THAT NEVER SYNCS is invisible,
+# because this can only see what reached this clone, and the host most likely to lose a
+# plan is the one that is not syncing; (3) it says nothing about a plan that was never
+# written down at all. It closes one failure mode: a plan sitting in raw/ that no index
+# knows about.
+#
+# NOTE `untracked-docs` DOES NOT COVER THIS. Its filename pattern is
+# audit/findings/mission/handoff/decisions/charter/rules — "plan" is not in it, so an
+# untracked plan is invisible to every other gate in this file.
+#
+# Graceful pass where there is no plans/raw — capture is the substrate repo's job, and a
+# project repo having none is the correct state, not a gap.
+CURRENT_CATEGORY="plan-uncaptured"
+section "Plan capture"
+pc_raw=".repo-manager/plans/raw"
+pc_index=".repo-manager/plans/INDEX.chloeai"
+if [ ! -d "$pc_raw" ]; then
+  pass "plan-uncaptured: no ${pc_raw} here — plan capture is the substrate repo's"
+elif [ ! -f "$pc_index" ]; then
+  soft_fail "plan-uncaptured: ${pc_raw} exists but ${pc_index} does not — the raw files are trackable and unfindable, which is the state D-27 part 2 exists to end"
+else
+  pc_missing=0; pc_untracked=0; pc_total=0
+  while IFS= read -r pc_f; do
+    [ -n "$pc_f" ] && [ -f "$pc_f" ] || continue
+    pc_total=$((pc_total + 1))
+    pc_base=$(basename "$pc_f")
+    if ! grep -qF -- "$pc_base" "$pc_index" 2>/dev/null; then
+      soft_fail "plan-uncaptured: ${pc_f} has no row in ${pc_index} — a captured plan nothing indexes cannot be told from a lost one"
+      pc_missing=$((pc_missing + 1))
+    fi
+    if ! git ls-files --error-unmatch "$pc_f" >/dev/null 2>&1; then
+      soft_fail "plan-uncaptured: ${pc_f} is UNTRACKED — it is inside the repo and still outside git, which is the original failure with extra steps"
+      pc_untracked=$((pc_untracked + 1))
+    fi
+  done <<EOF_PC
+$(find "$pc_raw" -type f 2>/dev/null | sort)
+EOF_PC
+  if [ "$pc_missing" -eq 0 ] && [ "$pc_untracked" -eq 0 ]; then
+    pass "plan-uncaptured: ${pc_total} raw plan(s), every one tracked and indexed"
+  fi
+fi
+
 CURRENT_CATEGORY="dev-flag-always-on"
 section "Dev flags in always-on agents"
 if [ ! -d .git ]; then
