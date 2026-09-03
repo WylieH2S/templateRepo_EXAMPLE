@@ -1,0 +1,78 @@
+#{{AIHEADER}}:1
+# ─────────────────────────────────────────────────────────────────────────────
+# A WORKED WAYSTONE EXAMPLE — COPY THIS, DO NOT LOAD IT.
+#
+# This file is NOT a card. It is deliberately named `waystone_EXAMPLE`, not
+# `_waystone`, so no gate reads it, no coverage counter scores it, and nothing
+# breaks when the fictional paths below do not exist. It ships with the template
+# on purpose: START_HERE §WISL waystones tells you HOW to author a card, and the
+# schema lives at the workspace canonical — but a stamped repo may sit on a
+# machine that cannot reach the workspace, and instructions with no worked
+# example in hand are how a convention quietly stops being followed.
+#
+# HOW TO USE IT: when a nameable seam emerges, copy the block between the two
+# frontmatter fences into `<that folder>/_waystone.{{AI}}ai`, delete every `#` comment, and
+# replace all of it with what is actually true. A card carried over with any of
+# this text still in it is worse than no card, because it will be believed.
+#
+# THE ONE RULE THAT MATTERS MOST: say what `validation:` actually proves AND what
+# it does not. "Scaffold only, nothing runs yet" is a correct `state`. A
+# directory-existence check must never read as a passing test suite.
+# ─────────────────────────────────────────────────────────────────────────────
+---
+wisl_version: 1                    # schema version; tools reject an unknown major
+folder: src/ingest                 # MUST equal this card's own location
+orient: "Ingest — parses inbound feed files into normalized records and hands them to src/store. ONE JOB: everything about the wire format lives here and nothing about the wire format lives anywhere else. Deliberately NOT `owns: **` at a repo root: a blanket claim scores as full coverage while leaving every subsystem unrouted, which is how a repo reads as 100% covered and routes nothing."
+owns:                              # GATE-CRITICAL. Repo-relative globs this folder is authoritative for.
+  - src/ingest/**                  # One glob per line, two-space indent — the bash extractor depends on it.
+depends_on:                        # Orientation edges only — a folder edge pulls the WHOLE folder.
+  - src/store                      # where parsed records go; NOT a file-set derivation, that is boot_path
+risk: >-
+  What is dangerous or high-judgment HERE, in specifics a newcomer could not guess.
+  Vague risk text is the most commonly skipped field and the most expensive one to
+  omit. Name the trap, not the category: "the parser accepts a truncated final
+  record and silently drops it" beats "be careful with parsing".
+continuity: "Where this folder's thread lives — e.g. readme_AI THR-004. Points at the story, not the code."
+validation: "make test-ingest   # unit tests over the parser; does NOT exercise a real feed"
+reviewed_at: "0000000"             # QUOTED git sha, 7-40 hex. A HUMAN reconciled `owns` with reality at
+                                   # this commit. Re-stamp it in the SAME COMMIT as any change to an
+                                   # owned file, or waystone-freshness fails — that is the gate working.
+actors:                            # perm is read | write | none
+  cloud: write
+  chloe-local: read                # source folders are `read`: the local model never self-edits its source
+  codex: read
+boot_path:                         # The bounded, ORDERED read-set. This is where WISL's value actually is.
+  - src/ingest/parser.py           # Order small-first: a small entry passes its surplus forward to the
+  - src/ingest/schema.py           # next, so a big file later in the list gets a larger allocation.
+# `heywy` is OPTIONAL and MUST BE THE LAST FRONTMATTER KEY. Every bash list
+# extractor on the gate path reads indented lines until the next top-level key,
+# so anything placed after `heywy` gets swallowed by its scan.
+#
+# NOTE WHAT JUST HAPPENED HERE: these lines are comments because they sit OUTSIDE
+# any value. Inside a `>-` block scalar below, a `#` is ordinary text — it does
+# NOT start a comment, and it will end up in the value verbatim. That trap is
+# easy to hit and invisible until something renders the card.
+heywy:
+  what: >-
+    Plain language, for {{HUMAN}}, not for an agent. What this is, in the terms
+    someone would use if they did not know the codebase.
+  state: >-
+    What actually works today, and what only looks like it does. This is the field
+    that earns trust; overstate here once and the whole card stops being read.
+  run: >-
+    The command to make it go.
+  check: >-
+    How to tell it is right — AND what a green result does not prove.
+  next: >-
+    The honest next step.
+---
+Prose orientation goes below the closing fence. Free text, read by humans and
+agents alike. Say what to read first and in what order, where the real depth is
+(folder count is a terrible proxy for complexity), and the gotchas that cost
+somebody an afternoon.
+
+Keep it short enough to survive the per-entry boot ceiling. If a boot source you
+declare is too large to arrive whole, either shrink it, reorder `boot_path` so a
+smaller entry passes surplus forward, or declare it under `boot_path_partial`
+with a REASON — a bare path there is rejected, because an exemption with no
+stated reason is a silencer rather than a decision.

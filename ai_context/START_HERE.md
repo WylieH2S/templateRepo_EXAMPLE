@@ -104,12 +104,23 @@ A waystone is authored with judgment when a *nameable* seam emerges, not per
 folder (blanket cards are low-signal and carry freshness-upkeep cost; a
 competent grep already ties them on recall — the standard's own measurement).
 
+**Start from the worked example that ships with this repo:**
+`ai_context/waystone_EXAMPLE.{{AI}}ai`. It is a complete, annotated card with
+every field explained inline. It is deliberately NOT named `_waystone.*`, so no
+gate reads it and no coverage counter scores it — copy the block between its
+two frontmatter fences, strip the comments, and replace all of it with what is true. It
+ships here on purpose: the schema below is workspace-owned, and a stamped repo
+may sit on a machine that cannot reach the workspace. Instructions with no
+example in hand are how a convention quietly stops being followed.
+
 When you author one:
 
 1. Follow the schema + parse contract at the workspace canonical:
    `~/GitHub/.repo-manager/standards/WISL/` (`WISL-STANDARD.{{AI}}ai` +
    `waystone.schema.{{AI}}ai` live there as `.chloeai` — the standard is
-   workspace-owned, duo-neutral in content).
+   workspace-owned, duo-neutral in content). The local example already conforms
+   to it; the canonical is what to read when you need a field this repo's
+   example does not exercise.
 2. Register the card in the workspace seam map + `seam-coverage.tsv` **in the
    same arc** — the drift-sweep `seam-coverage` gate enforces declared cards;
    unrecorded cards are how coverage accounting drifts.

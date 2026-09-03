@@ -19,9 +19,20 @@ risk: >-
   syncing a newer script version in, re-tokenize any duo-specific file
   extensions back to the {{AI}}ai / hey{{HUMAN}} tokens (and keep wording
   duo-neutral) before committing, or stamped repos inherit someone else's names.
+  THIS CARD CANNOT MAINTAIN ITSELF, AND THAT IS THE RISK MOST LIKELY TO BITE:
+  init-project.sh deletes it at bootstrap, so it has no downstream copy whose
+  drift would ever surface it, and this repo is TEMPLATE status — nobody works
+  here day to day, which is precisely the condition under which a card rots
+  unnoticed. Re-stamping it is therefore a step in REPO-MANAGER's template-update
+  procedure, not something this repo is trusted to do on its own: whenever
+  repoManager changes anything this card `owns` — which, at `**`, is any template
+  change at all — re-read the card and re-stamp `verified_at` IN THE SAME COMMIT.
+  Ruled by Wy 2026-09-03. The `owns: "**"` blanket is deliberate and is the one
+  place in the fleet where it is correct: this repo IS a single artifact with no
+  internal seams, so there is no subsystem a blanket claim could leave unrouted.
 continuity: "This repo is TEMPLATE status in the workspace ROSTER — read-only unless updating a fleet-wide standard. Substrate packs live in stacks/; workspace-level canonical skill copies are deployed per workspace/SETUP.md (repos symlink to those, not to this repo). validate-substrate and the standard lefthook hooks here are the authoritative pattern source. This waystone describes the TEMPLATE repo itself — init-project.sh deletes it at bootstrap."
 validation: "bash -n init-project.sh && bash .claude/skills/validate-substrate/validate.sh"
-verified_at: "b17032c"
+verified_at: "ab05a40"
 actors:
   maintainer-ai: write   # the AI maintaining the template standards
   other-agents: read
