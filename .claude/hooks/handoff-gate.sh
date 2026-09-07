@@ -115,17 +115,24 @@ active_block=$(awk '
   block != "" { block=block $0 ORS }
   END { printf "%s", block }
 ' "$SRC" 2>/dev/null)
+# Anchored to line-start (only optional leading whitespace before the field
+# name): a bare `grep -oE 'recommended_capability=...'` also matches the
+# schema string wherever a task_queue entry happens to quote it in prose (e.g.
+# a task documenting "real schema since ... is recommended_capability=economy|
+# balanced|..."), and `tail -1` then prefers that quoted example over the real
+# field a few lines above it — a false MISMATCH with no field ever changing.
+# Found live 2026-09-06 (homeLab, SESSION-025's own substrate-drift task item).
 rec_capability=$(printf '%s' "$active_block" \
-  | grep -oE 'recommended_capability="?[a-z_]+"?' \
+  | grep -oE '^[[:space:]]*recommended_capability="?[a-z_]+"?' \
   | tail -1 | sed 's/.*=//; s/"//g')
 legacy_model=$(printf '%s' "$active_block" \
-  | grep -oE 'recommended_model="?[a-z]+"?' \
+  | grep -oE '^[[:space:]]*recommended_model="?[a-z]+"?' \
   | tail -1 | sed 's/.*=//; s/"//g')
 if [ -z "$rec_capability" ] && [ -n "$legacy_model" ]; then
   rec_capability=$(native_capability "$legacy_model")
 fi
 rec_effort=$(printf '%s' "$active_block" \
-  | grep -oE 'recommended_effort="?[a-z]+"?' \
+  | grep -oE '^[[:space:]]*recommended_effort="?[a-z]+"?' \
   | tail -1 | sed 's/.*=//; s/"//g')
 eff_note="${rec_effort:-unspecified}"
 
