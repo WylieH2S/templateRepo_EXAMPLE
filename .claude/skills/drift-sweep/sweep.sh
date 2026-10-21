@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.50 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.52 — detect code/substrate drift in a repo.
+#
+# v0.1.52 (SESSION-154b, 2026-10-20): `plan-uncaptured` checks that INDEX rows are still TRUE
+#   (D-27). It asked only whether each raw file had a row, so it read green while P-10's file
+#   was rewritten in place and while P-01/P-02/P-09 said CAPTURED about deleted files. Now a
+#   raw file must match its row's sha256, and a CAPTURED row must have its file.
+#
+# v0.1.51 (SESSION-154b, 2026-10-20): new `lefthook-verified` (soft_fail, UNARMED), D-76.
+#   Every fleet pre-push arm is a lefthook `script:` job since D-75, resting on observed,
+#   undocumented behaviour (script jobs are not skipped where run jobs are). This warns when
+#   the installed lefthook version has not PASSED lefthook-skip-fixture.sh, so an upgrade
+#   is visible on the commit route instead of silent until a clobber.
 #
 # v0.1.50 (SESSION-153, 2026-10-20): an unknown `--fail-on` name exits 1, like an unknown
 #   flag. It used to match nothing and gate nothing: repoManager's pre-push named
@@ -3548,8 +3559,57 @@ else
   done <<EOF_PC
 $(find "$pc_raw" -type f 2>/dev/null | sort)
 EOF_PC
-  if [ "$pc_missing" -eq 0 ] && [ "$pc_untracked" -eq 0 ]; then
-    pass "plan-uncaptured: ${pc_total} raw plan(s), every one tracked and indexed"
+  # v0.1.52 (D-27): a row must still be TRUE, not merely present. Everything above asks
+  # whether each raw FILE has a row; nothing asked whether each ROW still describes a file.
+  # Two ways that broke, both unseen while this category read green: P-10's file was
+  # rewritten in place under the same name (09-15: the row kept a heading and sha256 no
+  # longer at that path), and P-01/P-02/P-09 kept saying CAPTURED for 13 days after bd43cfa
+  # committed their deletion. So: a raw file that exists must match its row's sha256 (any
+  # disposition), and a row whose disposition STARTS with CAPTURED must have its file.
+  # PROXY: the 16-hex prefix and the leading disposition word. Blind to a row whose recorded
+  # hash was itself wrong at capture, and to rows for a host whose raw/ never synced here.
+  _pc_sha() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | cut -c1-16; else shasum -a 256 "$1" | cut -c1-16; fi; }
+  pc_rows=0; pc_lies=0
+  while IFS='|' read -r pc_id pc_name pc_host pc_hash pc_disp; do
+    [ -n "$pc_id" ] || continue
+    pc_rows=$((pc_rows + 1))
+    pc_path="${pc_raw}/${pc_host}/${pc_name}"
+    if [ -f "$pc_path" ]; then
+      pc_have=$(_pc_sha "$pc_path")
+      if [ -n "$pc_hash" ] && [ "$pc_have" != "$pc_hash" ]; then
+        soft_fail "plan-uncaptured: ${pc_id} records sha256 ${pc_hash} but ${pc_path} hashes to ${pc_have} — rewritten in place, so the row describes a plan no longer at that path (git log -p -- ${pc_path} holds the old bytes)"
+        pc_lies=$((pc_lies + 1))
+      fi
+    elif [ "$pc_disp" = "CAPTURED" ]; then
+      soft_fail "plan-uncaptured: ${pc_id} says CAPTURED but ${pc_path} is gone — the row claims a verbatim copy that no longer exists (git log --diff-filter=D -- ${pc_path} finds where; re-dispose the row)"
+      pc_lies=$((pc_lies + 1))
+    fi
+  done <<EOF_PCR
+$(awk '
+  function trim(t) { gsub(/^[ \t]+|[ \t]+$/, "", t); return t }
+  function emit(   n, f, i, t, pid, name, h, d) {
+    if (row == "") return
+    n = split(row, f, " · ")
+    if (n >= 5 && match(f[1], /^\[P-[0-9]+\] /)) {
+      pid = substr(f[1], 2, RLENGTH - 3); name = trim(substr(f[1], RLENGTH + 1))
+      h = ""; d = ""
+      for (i = 4; i <= n; i++) {
+        t = trim(f[i])
+        if (h == "" && length(t) == 16 && t ~ /^[0-9a-f]+$/) h = t
+        if (i >= 5 && d == "" && match(t, /^(CAPTURED|DERIVED|DECLINED|LOST|PENDING)/)) d = substr(t, 1, RLENGTH)
+      }
+      if (name ~ /\.md$/) print pid "|" name "|" trim(f[2]) "|" h "|" d
+    }
+    row = ""
+  }
+  /^\[P-[0-9]+\] / { emit(); row = $0; next }
+  /^$/ || /^# / { emit(); next }
+  row != "" { t = $0; sub(/^[ \t]+/, "", t); row = row " " t }
+  END { emit() }
+' "$pc_index" 2>/dev/null)
+EOF_PCR
+  if [ "$pc_missing" -eq 0 ] && [ "$pc_untracked" -eq 0 ] && [ "$pc_lies" -eq 0 ]; then
+    pass "plan-uncaptured: ${pc_total} raw plan(s), every one tracked and indexed; ${pc_rows} row(s), none contradicted by raw/"
   fi
 fi
 
@@ -3653,6 +3713,51 @@ $(printf '%s' "$dfa_report")"
       pass "dev-flag-always-on: no tracked plist is always-on (RunAtLoad/KeepAlive)"
     else
       pass "dev-flag-always-on: ${dfa_n} always-on agent(s), none passing an argument their own comments flag as dev-only"
+    fi
+  fi
+fi
+
+# ── 14a. lefthook skip-fixture verification (v0.1.51, D-76) ───
+# Since D-75 every fleet pre-push arm is a lefthook `script:` job, because lefthook skips
+# `run:` jobs — `(skip) no matching push files` — on a ff of already-pushed commits and on
+# a force-push from a clone with a stale remote-tracking ref, and script jobs were MEASURED
+# not to skip there (2.1.11 CHLOE-WyliNux, 2.1.8 ChloeMac). Observed, not documented: a
+# lefthook release that unifies the two silences every arm, and nothing would say so.
+# This is the station: compare the installed version against the versions the fixture
+# PASSED on (.repo-manager/lefthook_verified.chloeai, written by the fixture's --record).
+#
+# THE PROXY IS THE VERSION STRING, not the behaviour. It passes falsely if a version is
+# typed into the record without a passing run, or if two builds share a version string.
+# Graceful pass when the repo has no script-form job (nothing depends on the behaviour),
+# when lefthook is not on PATH (CI; hooks cannot run here anyway), or when the record is
+# not reachable (a template clone outside the fleet).
+# soft_fail: WARN by default, FAIL via --fail-on=lefthook-verified.
+CURRENT_CATEGORY="lefthook-verified"
+section "lefthook skip-fixture verification"
+if [ ! -f lefthook.yml ] || ! grep -qE '^[[:space:]]+script:[[:space:]]' lefthook.yml; then
+  pass "lefthook-verified: no lefthook script: jobs here — nothing depends on the skip behaviour"
+elif ! command -v lefthook >/dev/null 2>&1; then
+  pass "lefthook-verified: lefthook not on PATH — skipping (no hook can run here either)"
+else
+  lv_ver=$(lefthook version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  _top=$(git rev-parse --show-toplevel 2>/dev/null)
+  lv_rec=""
+  for cand in \
+    "${_top:+${_top}/../.repo-manager/lefthook_verified.chloeai}" \
+    "${HOME}/GitHub/.repo-manager/lefthook_verified.chloeai"; do
+    [ -n "$cand" ] && [ -f "$cand" ] && { lv_rec="$cand"; break; }
+  done
+  lv_fix='bash ~/GitHub/.claude/skills/drift-sweep/lefthook-skip-fixture.sh --record'
+  if [ -z "$lv_ver" ]; then
+    soft_fail "lefthook-verified: could not read a version from \`lefthook version\` — cannot tell whether the pre-push arms still fire; run: ${lv_fix}"
+  elif [ -z "$lv_rec" ]; then
+    pass "lefthook-verified: record not reachable from here (outside the fleet) — skipping"
+  else
+    lv_hit=$(grep -E "^${lv_ver//./\\.} · " "$lv_rec" | head -1)
+    if [ -n "$lv_hit" ]; then
+      pass "lefthook-verified: lefthook ${lv_ver} passed the skip fixture (${lv_hit#* · })"
+    else
+      soft_fail "lefthook-verified: lefthook ${lv_ver} has NOT passed the skip fixture — if it skips script: jobs, this repo's pre-push arms are silent on a ff of already-pushed commits and on a stale-cache rewind. Run: ${lv_fix}"
     fi
   fi
 fi

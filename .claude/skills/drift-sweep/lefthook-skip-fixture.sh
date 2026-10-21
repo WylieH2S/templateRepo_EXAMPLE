@@ -16,8 +16,21 @@
 # Exit 0 = script form still fires. Exit 1 = the arms are inert on those pushes
 # again; fall back to `lefthook run pre-push --force` by hand until fixed.
 #
+# --record: on PASS, also append this version + host to the record drift-sweep's
+# `lefthook-verified` reads (D-76), so a recorded version is one this fixture passed
+# on, not one someone typed. Without it the fixture writes nothing outside mktemp.
+# Every PASS prints the same line as `RECORD: ...`, so a run on another host (e.g.
+# over ssh) can be recorded from its own output.
+#
 # Writes only under a mktemp dir, with HOME pointed inside it; removes it on exit.
 set -u
+RECORD=0
+case "${1:-}" in
+  --record) RECORD=1 ;;
+  "") ;;
+  *) echo "usage: $0 [--record]"; exit 2 ;;
+esac
+REC_FILE="${LEFTHOOK_VERIFIED_FILE:-$HOME/GitHub/.repo-manager/lefthook_verified.chloeai}"
 command -v lefthook >/dev/null 2>&1 || { echo "lefthook not on PATH"; exit 2; }
 T=$(mktemp -d "${TMPDIR:-/tmp}/lh-skip.XXXXXX") || exit 2
 trap 'rm -rf "$T"' EXIT
@@ -60,6 +73,20 @@ echo "ff-already-pushed:  $FF"
 echo "stale-cache-rewind: $RW"
 echo "script args:        ${ARGS:-none}"
 case "$FF|$RW|$ARGS" in
-  *"script=FIRED"*"|"*"script=FIRED"*"|S:--quiet --fail-on=x,y") echo "PASS: script form fires on both"; exit 0 ;;
+  *"script=FIRED"*"|"*"script=FIRED"*"|S:--quiet --fail-on=x,y")
+    echo "PASS: script form fires on both"
+    ver=$(lefthook version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    host=$(hostname -s 2>/dev/null || hostname)
+    line="${ver} · ${host} · $(uname -s | tr '[:upper:]' '[:lower:]') · $(date +%F) · PASS"
+    echo "RECORD: $line"
+    if [ "$RECORD" -eq 1 ]; then
+      [ -f "$REC_FILE" ] || { echo "record file not found: $REC_FILE"; exit 1; }
+      if grep -qF -- "${ver} · ${host} · " "$REC_FILE"; then
+        echo "already recorded for ${ver} on ${host}: $REC_FILE"
+      else
+        echo "$line" >> "$REC_FILE" && echo "recorded in $REC_FILE"
+      fi
+    fi
+    exit 0 ;;
   *) echo "FAIL: script form skipped or lost its args — the pre-push arms are inert on this push"; exit 1 ;;
 esac
