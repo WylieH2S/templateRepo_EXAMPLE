@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.52 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.53 — detect code/substrate drift in a repo.
+#
+# v0.1.53 (SESSION-154e, 2026-10-20): `plan-uncaptured` checks the LIVE plans on this host
+#   (D-77). Every `.md` in <config>/plans must be byte-identical in raw/<host>/, and a plans
+#   dir that is still the old symlink is flagged, because Claude Code's 30-day retention sweep
+#   deletes captured plans through it. Measures the property, not the hooks that copy.
 #
 # v0.1.52 (SESSION-154b, 2026-10-20): `plan-uncaptured` checks that INDEX rows are still TRUE
 #   (D-27). It asked only whether each raw file had a row, so it read green while P-10's file
@@ -3608,8 +3613,43 @@ $(awk '
   END { emit() }
 ' "$pc_index" 2>/dev/null)
 EOF_PCR
-  if [ "$pc_missing" -eq 0 ] && [ "$pc_untracked" -eq 0 ] && [ "$pc_lies" -eq 0 ]; then
-    pass "plan-uncaptured: ${pc_total} raw plan(s), every one tracked and indexed; ${pc_rows} row(s), none contradicted by raw/"
+  # v0.1.53 (D-77): the LIVE plans on THIS host must be in raw/<host>/, byte for byte. Claude
+  # Code's retention sweep unlinks `.md` files in <config>/plans after cleanupPeriodDays (30 by
+  # default), so the capture is a COPY made by .claude/hooks/plan-capture.sh at two stations.
+  # This checks the property, not the wiring: whatever installed or failed to install the hooks,
+  # a live plan missing from raw/ is the loss in progress. The symlink era is flagged too, since
+  # under it the sweep deletes the captured copies themselves. The destination comes from
+  # `plan-capture.sh --print-dst`, so the host-name mapping exists in exactly one place.
+  # PROXY: byte equality of the plans present NOW. Blind to a plan purged before any capture.
+  # Graceful where there is no live plans dir (CI, a host that never ran Claude Code).
+  pc_live="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plans"
+  pc_cap=".claude/hooks/plan-capture.sh"
+  pc_live_n=0; pc_live_bad=0; pc_live_state="no live plans dir on this host"
+  if [ -L "$pc_live" ]; then
+    soft_fail "plan-uncaptured: ${pc_live} is still a SYMLINK into raw/ — Claude Code's 30-day cleanup deletes captured plans THROUGH it (D-77). Migrate: bash ~/GitHub/.claude/hooks/plan-capture-install.sh --apply"
+    pc_live_bad=1
+  elif [ -d "$pc_live" ]; then
+    if [ ! -f "$pc_cap" ]; then
+      soft_fail "plan-uncaptured: ${pc_cap} is missing, so this host's capture destination cannot be computed (D-77)"
+      pc_live_bad=1
+    else
+      pc_dst=$(bash "$pc_cap" --print-dst)
+      for pc_f in "$pc_live"/*.md; do
+        [ -f "$pc_f" ] && [ ! -L "$pc_f" ] || continue
+        pc_live_n=$((pc_live_n + 1)); pc_t="${pc_dst}/$(basename "$pc_f")"
+        if [ ! -f "$pc_t" ]; then
+          soft_fail "plan-uncaptured: live plan ${pc_f} is NOT in ${pc_dst}/ — plan-capture has not run since it was written, or is not installed on this host (D-77). Run: bash ~/GitHub/.claude/hooks/plan-capture.sh"
+          pc_live_bad=$((pc_live_bad + 1))
+        elif ! cmp -s "$pc_f" "$pc_t"; then
+          soft_fail "plan-uncaptured: live plan ${pc_f} differs from its copy in ${pc_dst}/ — changed since the last capture (D-77). Run: bash ~/GitHub/.claude/hooks/plan-capture.sh"
+          pc_live_bad=$((pc_live_bad + 1))
+        fi
+      done
+      pc_live_state="${pc_live_n} live plan(s) on this host, each byte-identical in raw/"
+    fi
+  fi
+  if [ "$pc_missing" -eq 0 ] && [ "$pc_untracked" -eq 0 ] && [ "$pc_lies" -eq 0 ] && [ "$pc_live_bad" -eq 0 ]; then
+    pass "plan-uncaptured: ${pc_total} raw plan(s), every one tracked and indexed; ${pc_rows} row(s), none contradicted by raw/; ${pc_live_state}"
   fi
 fi
 
