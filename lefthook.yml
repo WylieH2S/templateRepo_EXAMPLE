@@ -73,73 +73,57 @@ pre-commit:
 
 pre-push:
   parallel: true
-  commands:
+  # SCRIPT FORM, ON PURPOSE (D-75, 2026-10-20). READ BEFORE CHANGING IT BACK.
+  # lefthook skips a `run:` pre-push job — `(skip) no matching push files` — when
+  # HEAD has no diff against its OWN @{push}, whatever refs the push moves. Two
+  # pushes hit that by construction, and both arms below used to be absent on them:
+  #   - a fast-forward of already-pushed commits: `git push origin work:main` with
+  #     work level with origin/work (planTheBeast, 2026-10-20)
+  #   - a force-push from a clone whose origin/<branch> is STALE because another
+  #     host pushed: the D-18 rewind, the destructive one
+  # `script:` jobs are NOT skipped on either. Measured 2026-10-20 on lefthook 2.1.11
+  # (CHLOE-WyliNux) and 2.1.8 (ChloeMac). That is observed behaviour, not documented
+  # behaviour, so after ANY lefthook upgrade, on every host, run:
+  #   bash ~/GitHub/.claude/skills/drift-sweep/lefthook-skip-fixture.sh
+  # Exit 1 = these arms are inert on those pushes again; until fixed, run
+  # `lefthook run pre-push --force` by hand before such a push.
+  # The two scripts in .lefthook/pre-push/ are identical in every fleet repo. What
+  # differs per repo is `args`, so this repo's --fail-on list stays in this file,
+  # where validate-substrate and the fail-on audit read it.
+  jobs:
     # The blocking half of the backstop (SESSION-085). `--no-verify` on `git commit`
     # does NOT skip pre-push, so a locally-bypassed commit is still caught before it
     # reaches origin — the exact DEC-103 pattern. Closes SL-001 residual #1, open
     # since June: "the arm is pre-commit only, with no push-time backstop".
-    # Honest limit: `git push --no-verify` still skips this, AND NOTHING CATCHES IT.
-    # This comment used to name "the nightly fleet-sweep in repoManager" as the
-    # backstop for a determined bypass. Checked 2026-08-28: no systemd timer, no
-    # cron entry and no unit file for such a sweep exists on the Linux host, and on
-    # the Mac the scan LaunchAgent is deliberately unloaded. The backstop runs
-    # nowhere. Do not read a green push as evidence the substrate is clean; if a
-    # real backstop is wanted, it has to be built (docket D-17).
-    drift-sweep-push:
-      run: bash .claude/skills/drift-sweep/sweep.sh --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,waystone-freshness,wrap-continuity
+    # Honest limit: `git push --no-verify` skips this. What catches that is the
+    # nightly `fleet-sweep.yml` in repoManager (since 2026-08-06): it DETECTS, up to
+    # 24h later, it does not block, and only while it is green — it was red on every
+    # run 2026-09-15..10-20 (D-71). From 2026-08-28 this comment said the backstop
+    # "runs nowhere": that check looked in three places and the job was in a fourth
+    # (D-17). Do not read a green push as evidence the substrate is clean.
+    - name: drift-sweep-push
+      script: drift-sweep-push.sh
+      runner: bash
+      args: --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,waystone-freshness,wrap-continuity
     # Block a push that would DISCARD commits the remote already has.
     #
-    # REPLACES `no-force-push-main`, which was named for a guarantee it did not
-    # provide: its body was `echo "ℹ Pushing to $branch"` and it blocked nothing.
-    # It could not have worked in any form — it read the pre-push ref from "$1",
-    # and lefthook forwards NEITHER args NOR stdin to commands (verified against
-    # lefthook 2026-08-28 with a probe command: both empty). So it never even saw
-    # the refs it claimed to judge. Anyone reading this file believed force-pushes
-    # to main were prevented for as long as it sat here.
+    # REPLACES `no-force-push-main`, which blocked nothing: its body was an echo,
+    # and it read the pushed ref from "$1", which lefthook never passed to it.
     #
     # THE PROXY: this asks the remote (a fetch) instead of trusting the local
     # remote-tracking cache, which goes stale exactly when a second host pushes —
     # the case that matters. HOW IT PASSES FALSELY: `git push --no-verify` skips
-    # every hook here, and a fetch failure is treated as "cannot tell" and allowed
-    # through rather than blocking work on a flaky network.
+    # it; a fetch failure is treated as "cannot tell" and allowed through rather
+    # than blocking work on a flaky network; and a lefthook release that starts
+    # skipping script jobs as well would silence it (the fixture above catches that).
     #
-    # ── MEASURED 2026-09-02 (docket D-18 pilot). READ BEFORE RELYING ON THIS. ──
-    # IT DOES NOT FIRE ON A PURE REWIND, WHICH IS THE MOST DESTRUCTIVE CASE.
-    # lefthook SKIPS every pre-push command when the push introduces no new
-    # commits — it prints `(skip) no matching push files` — and a force-push whose
-    # local branch is strictly BEHIND the remote introduces none by definition.
-    # Measured on a two-clone fixture with lefthook 2.1.11:
-    #   local ahead 1 + remote ahead 1, --force  -> guard FIRES, push BLOCKED  ✓
-    #   ALLOW_FORCE_PUSH=1 on that same state    -> allowed through            ✓
-    #   push that adds a commit                  -> guard runs                 ✓
-    #   local strictly BEHIND, --force           -> SKIPPED, remote CLOBBERED  ✗
-    # The escape hatch is a CLI flag on the runner, `lefthook run pre-push
-    # --force` ("do not skip if no files changed"), which DOES make it fire. There
-    # is no config key for it: `force: true` and `skip_empty: false` were both
-    # tried at hook and command level and neither changed the skip. The generated
-    # `.git/hooks/pre-push` shim calls `call_lefthook run "pre-push" "$@"` with no
-    # such flag, and that shim is untracked and regenerated by `lefthook install`,
-    # so editing it there is a fix that can vanish without notice.
-    # NOTE `drift-sweep-push` ABOVE HAS THE SAME HOLE, for the same reason.
-    # repoManager is NOT affected: its pre-push is plain-git via core.hooksPath,
-    # not lefthook. The 11 project repos all are.
-    # This comment states the limit rather than removing the guard, because the
-    # guard is still strictly better than the `no-force-push-main` it replaced —
-    # that one could never fire at all. But do not read a green push as proof the
-    # remote was safe from a rewind.
-    no-clobber-remote:
-      run: |
-        br=$(git rev-parse --abbrev-ref HEAD)
-        up=$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null) || exit 0
-        git fetch --quiet origin "$br" 2>/dev/null || true
-        behind=$(git rev-list --count "HEAD..$up" 2>/dev/null || echo 0)
-        if [ "${behind:-0}" -gt 0 ]; then
-          echo "✗ $up has $behind commit(s) this clone does not have."
-          echo "  A force-push here DISCARDS them. Integrate first: git pull --rebase"
-          if [ "${ALLOW_FORCE_PUSH:-0}" = "1" ]; then
-            echo "  → ALLOW_FORCE_PUSH=1 set; proceeding on explicit intent."
-          else
-            echo "  Override deliberately with: ALLOW_FORCE_PUSH=1 git push --force ..."
-            exit 1
-          fi
-        fi
+    # ── MEASURED: D-18 pilot 2026-09-02 (run form), D-75 2026-10-20 (script form) ──
+    #                                           run form            script form
+    #   local ahead 1 + remote ahead 1, --force  FIRES, BLOCKED      FIRES, BLOCKED
+    #   ALLOW_FORCE_PUSH=1 on that same state    allowed through     allowed through
+    #   stale origin/<branch>, --force (rewind)  SKIPPED, CLOBBERED  FIRES, BLOCKED
+    # repoManager is NOT affected either way: its pre-push is plain git via
+    # core.hooksPath, not lefthook.
+    - name: no-clobber-remote
+      script: no-clobber-remote.sh
+      runner: sh
