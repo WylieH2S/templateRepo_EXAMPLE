@@ -1,6 +1,31 @@
 #!/usr/bin/env bash
-# drift-sweep v0.1.46 — detect code/substrate drift in a repo.
+# drift-sweep v0.1.50 — detect code/substrate drift in a repo.
 #
+# v0.1.50 (SESSION-153, 2026-10-20): an unknown `--fail-on` name exits 1, like an unknown
+#   flag. It used to match nothing and gate nothing: repoManager's pre-push named
+#   `untracked` (the category is `untracked-docs`) for eight weeks. Measured first: that was
+#   the only unknown name in any tracked file fleet-wide, and is fixed in the same commit.
+#
+# v0.1.49 (SESSION-153, 2026-10-20): `cruft` CAN FAIL (D-72). Every hit was a bare warn(),
+#   which never touches EXIT_FAILS, so the backstop's `--fail-on=...,cruft` gated a category
+#   that could not fail. Now soft_fail (not fail(): flagless sweeps stay WARN). The dir match
+#   also needed a slash before the name and allowed only direct children, so a top-level
+#   old/ was invisible; now any depth, shallowest dir reported once. No lefthook arm names
+#   cruft. repoManager's two memory files named for BF6 engine versions are allowlisted in
+#   its new .claude/drift-sweep.conf; without that, the 11-01 backstop run would go red.
+#
+# v0.1.48 (SESSION-152, 2026-10-20): `--fleet` ends with a `── Fleet ──` tally that NAMES
+#   each non-clean repo and says WHY: gated failure (child exit 1) vs NOT EVALUATED (exit 2,
+#   refused or unreadable). The loop folded both into one exit 1, so the nightly backstop
+#   ran red 17 days on nerdcraft's correct refusal with every printed summary at
+#   "Failures: 0". Exit code unchanged. Also: the backstop health line said "NO success on
+#   record" from a 20-run window; the last green was 36 days back. It now says the window.
+#
+# v0.1.47 (SESSION-127B, 2026-09-03): new `docket-filing` (soft_fail, UNARMED). The queue's
+#   # BLOCKED section sat empty while two rows opened with "BLOCKED ON WY" from inside
+#   # OPEN. Checks MECHANICS only — the exact licence DOCKET.chloeai's own header grants.
+#   Found a false positive on run one ("NOT BLOCKED ON HARDWARE ANY MORE") and then caught a
+#   real misfile made while refiling the very rows that motivated it.
 # v0.1.46 (SESSION-118, 2026-09-02): new `plan-uncaptured` (soft_fail, UNARMED). D-27
 #   symlinked ~/.claude/plans into .repo-manager/plans/raw/<host>/ so plans land in git
 #   as they are written; this checks every raw file is TRACKED and has a row in
@@ -626,11 +651,12 @@
 #   --json                   Emit JSON to stdout instead of human-readable output.
 #   --fail-on=<categories>   Comma-separated list of categories that count toward
 #                            the exit code. All categories still run and report.
-#                            If omitted, all failures count. Categories:
+#                            If omitted, all failures count. An unknown name exits 1
+#                            (v0.1.50). Categories include:
 #                              working-tree, untracked-docs, cruft, file-journals,
 #                              orphans, mission-freshness, claude-md, waystone-validity,
 #                              waystone-freshness, up-sync, wrap-continuity, wisl-graph,
-#                              seam-coverage
+#                              seam-coverage — the full set is every CURRENT_CATEGORY below
 #
 # wrap-continuity, wisl-graph + seam-coverage are ADVISORY (soft_fail): WARN by
 # default, hard FAIL only when explicitly named in --fail-on (the "advisory-first,
@@ -723,6 +749,26 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# ── --fail-on names must be real categories (v0.1.50) ─────────
+# should_fail_on() is an exact match, so a misspelt name matches NOTHING and silently
+# gates nothing. repoManager's pre-push named `untracked` (the category is
+# `untracked-docs`) from 2026-08-28 to 2026-10-20, so its untracked-docs gate never
+# fired; found the session D-72 showed `cruft` could not fail either. Rejected like an
+# unknown flag. The list is read from this file's own CURRENT_CATEGORY lines, the same
+# source doc-coverage uses, so a new category is known the moment it exists.
+if [ -n "$FAIL_ON_CATEGORIES" ]; then
+  _known_cats=$(grep -oE 'CURRENT_CATEGORY="[a-z0-9-]+"' "$SELF" | sed 's/.*="//;s/"$//' | sort -u)
+  _bad_cats=""
+  for _c in ${FAIL_ON_CATEGORIES//,/ }; do
+    echo "$_known_cats" | grep -qxF "$_c" || _bad_cats="${_bad_cats} ${_c}"
+  done
+  if [ -n "$_bad_cats" ]; then
+    echo "Unknown --fail-on category:${_bad_cats} — it would match nothing and gate nothing." >&2
+    echo "Known: $(echo $_known_cats | tr ' ' ',')" >&2
+    exit 1
+  fi
+fi
+
 # ── Fleet mode ────────────────────────────────────────────────
 # Explicit opt-in to iterate a workspace root, sweeping each child repo in its
 # OWN root — the only context where that repo's card paths resolve.
@@ -735,12 +781,30 @@ if [ "$FLEET_MODE" = "1" ]; then
   [ -n "$FAIL_ON_CATEGORIES" ] && _pass="$_pass --fail-on=$FAIL_ON_CATEGORIES"
   [ "$MAINTENANCE_MODE" = "1" ] && _pass="$_pass --maintenance"
   _fleet_n=0
+  # WHY each child's exit code is KEPT, not just folded into _fleet_rc. A child exits 1
+  # for a gated FAILURE and 2 when it could NOT EVALUATE the repo (refused it, or could
+  # not enter it) — and those need different fixes. Folded together, the nightly backstop
+  # ran red 2026-10-01..10-17 on nerdcraft's refusal while every summary it printed read
+  # "Failures: 0"; the cause sat in one stderr line among ~2,000. The exit code stays as
+  # it was; the tally below is what names the repo and the cause.
+  _fleet_failed=""
+  _fleet_unread=""
+  _fleet_other=""
+  _fleet_note() {
+    case "$2" in
+      0) ;;
+      1) _fleet_rc=1; _fleet_failed="${_fleet_failed} $1" ;;
+      2) _fleet_rc=1; _fleet_unread="${_fleet_unread} $1" ;;
+      *) _fleet_rc=1; _fleet_other="${_fleet_other} $1(exit $2)" ;;
+    esac
+  }
   for _d in */; do
     _r="${_d%/}"
     [ -d "$_r/.git" ] || continue
     echo "════════ $_r ════════"
     # shellcheck disable=SC2086
-    SWEEP_FLEET_CHILD=1 bash "$SELF" $_pass "$_r" || _fleet_rc=1
+    SWEEP_FLEET_CHILD=1 bash "$SELF" $_pass "$_r"
+    _fleet_note "$_r" $?
     _fleet_n=$((_fleet_n + 1))
     echo
   done
@@ -767,7 +831,8 @@ if [ "$FLEET_MODE" = "1" ]; then
     if [ -n "$_sub" ] && [ -d "$_sub/.git" ]; then
       echo "════════ $(basename "$_sub") (control plane — outside the workspace root) ════════"
       # shellcheck disable=SC2086
-      SWEEP_FLEET_CHILD=1 bash "$SELF" $_pass "$_sub" || _fleet_rc=1
+      SWEEP_FLEET_CHILD=1 bash "$SELF" $_pass "$_sub"
+      _fleet_note "$(basename "$_sub")" $?
       _fleet_n=$((_fleet_n + 1))
       echo
     fi
@@ -785,6 +850,13 @@ if [ "$FLEET_MODE" = "1" ]; then
     echo "  parent (~/GitHub), not the control-plane repo — run it from there, or pass" >&2
     echo "  the root explicitly: sweep.sh --fleet <fleet-root>" >&2
     exit 2
+  fi
+  if [ "$JSON_OUTPUT" != "1" ]; then
+    echo "── Fleet ──"
+    echo "Repos visited: ${_fleet_n}"
+    echo "Gated failures (exit 1):${_fleet_failed:- none}"
+    echo "Not evaluated (exit 2 — refused or unreadable):${_fleet_unread:- none}"
+    [ -n "$_fleet_other" ] && echo "Sweep itself errored:${_fleet_other}"
   fi
   exit "$_fleet_rc"
 fi
@@ -1285,12 +1357,16 @@ EOF
     return 0                                    # green and current — say nothing
   fi
 
-  # Red. Distinguish "broke recently" from "never worked": different problems, and
-  # the second is the one that hides, because there is no green run to have lost.
+  # Red. Distinguish "broke recently" from "red for the whole window": different
+  # problems, and the second is the one that hides, because there is no green run to
+  # have lost. The window is the last 20 runs, NOT the record — this line used to say
+  # "NO success on record" / "never once succeeded" on 2026-10-20, when the last green
+  # was 2026-09-14, 36 runs back. A claim wider than its query is the overclaim this
+  # tool exists to catch.
   if [ "$nsucc" = "0" ]; then
-    printf '    backstop %s: RED — last run %s %sd ago; %s of the last %s runs failed, with NO success on record.\n' \
+    printf '    backstop %s: RED — last run %s %sd ago; all %s of the last %s runs failed, NO success in that window.\n' \
       "$wf" "$last_c" "${age_d:-?}" "$nfail" "$ntot"
-    printf '      A backstop that has never once succeeded is not protecting anything.  gh run view %s --log-failed\n' "$last_id"
+    printf '      A backstop red for its whole window is not protecting anything.  gh run view %s --log-failed\n' "$last_id"
   else
     printf '    backstop %s: RED — last run %s %sd ago (%s of last %s failed).  gh run view %s --log-failed\n' \
       "$wf" "$last_c" "${age_d:-?}" "$nfail" "$ntot" "$last_id"
@@ -1605,19 +1681,38 @@ if [ -d .git ]; then
 fi
 
 # ── 3. Known-cruft directories + versioned backups ────────────
+# soft_fail since v0.1.49: WARN by default, FAIL via --fail-on=cruft. Until then every hit
+# was a bare warn(), which never touches EXIT_FAILS — so the nightly backstop gated
+# `--fail-on=...,cruft` on a category that could not fail (D-72). soft_fail, NOT fail():
+# fail() counts when --fail-on is omitted, which would have turned every flagless sweep
+# (wrap-gate's, boot-source-triage's, a by-hand run) red on the first stray backup.
+#
+# THE PROXY, AND HOW IT PASSES FALSELY. The proxy is a NAME LIST — old, testing,
+# _backup*, _TEMP* as a path component, or a _vN filename suffix. The property is "no dead
+# copy of the code is tracked". Blind to (1) a dead copy under any other name (prev/,
+# archive/, foo.py.orig), (2) cruft in a git WORKTREE, since `[ -d .git ]` is false there,
+# and (3) untracked cruft, by design. The dir match used to need a slash BEFORE the name
+# and allowed only direct children, so a top-level old/ and old/sub/x.py were both
+# invisible — a planted, committed old/planted.py passed (SESSION-152). It now matches the
+# component at any depth and reports the SHALLOWEST cruft dir, once.
 CURRENT_CATEGORY="cruft"
 section "Known-cruft directories + versioned backups"
 cruft_found=0
+CRUFT_DIR_RE='old|testing|_backup[^/]*|_TEMP[^/]*'
 if [ -d .git ]; then
   cruft_files=$(git ls-files 2>/dev/null \
-    | grep -E '/(old|testing|_backup[^/]*|_TEMP[^/]*)/[^/]*$' \
+    | grep -E "(^|/)(${CRUFT_DIR_RE})/" \
     || true)
   if [ -n "$cruft_files" ]; then
-    cruft_dirs=$(echo "$cruft_files" | sed 's|/[^/]*$||' | sort -u)
+    cruft_dirs=$(echo "$cruft_files" \
+      | awk -F/ -v re="^(${CRUFT_DIR_RE})\$" '{
+          p = ""
+          for (i = 1; i < NF; i++) { p = (p == "" ? $i : p "/" $i); if ($i ~ re) { print p; break } }
+        }' | sort -u)
     while IFS= read -r d; do
       [ -z "$d" ] && continue
       file_count=$(echo "$cruft_files" | grep -c "^${d}/" || true)
-      warn "cruft dir: ${d}/ (${file_count} tracked files)"
+      soft_fail "cruft dir: ${d}/ (${file_count} tracked files)"
       cruft_found=1
     done <<< "$cruft_dirs"
   fi
@@ -1636,7 +1731,7 @@ if [ -d .git ]; then
       # destroy the version it exists to record. Same shape as ORPHAN_EXPORT_ALLOWLIST:
       # a repo declares its exception rather than the check guessing.
       if echo "$f" | grep -qE "$VERSIONED_BACKUP_ALLOWLIST"; then continue; fi
-      warn "versioned-backup file: ${f}"
+      soft_fail "versioned-backup file: ${f}"
       cruft_found=1
     done <<< "$vbak"
   fi
@@ -3344,6 +3439,89 @@ fi
 # untracked plan is invisible to every other gate in this file.
 #
 # Graceful pass where there is no plans/raw — capture is the substrate repo's job, and a
+# ── DOCKET filing discipline (soft_fail) ──────────────────────
+# WHY THIS IS ALLOWED TO EXIST. DOCKET.chloeai's own header says its ordering and closure
+# discipline "are enforced by NOTHING but the reader", deliberately — "if this file ever
+# grows a gate, gate the MECHANICS (unique IDs, every CLOSED row carrying a why and a date,
+# no OPEN row older than N sessions without a touch) and never the judgement." This checks
+# mechanics only. Whether an item SHOULD be blocked is judgement and is not touched here;
+# whether a row that CALLS ITSELF blocked is FILED under # BLOCKED is arithmetic.
+#
+# WHAT FORCED IT (Wy, 2026-09-03: "we need the blocked list to be precise and up-to-date").
+# The # BLOCKED section sat EMPTY while D-42 and D-43 both opened with the literal words
+# "BLOCKED ON WY" and both sat under # OPEN. The one surface built to answer "what is
+# blocked on me" answered "nothing", and the true answer was reachable only by grepping row
+# bodies. A section authoritative by name and unpopulated in fact is this fleet's signature
+# defect, applied to the file that tracks it.
+#
+# THE PROXY, STATED. The proxy is the STRING "BLOCKED ON" in a row body versus the section
+# heading the row sits under. That is a text match, not a model of blockage.
+# HOW IT PASSES FALSELY, in both directions:
+#   - A row genuinely blocked on Wy that never says "BLOCKED ON" is INVISIBLE here. This
+#     finds misfiling, never unblockedness — it cannot tell you an OPEN row is secretly stuck.
+#   - A CLOSED row narrating history ("was BLOCKED ON the M2") is not flagged, because only
+#     OPEN rows are tested; a row that says it in passing while genuinely actionable would be.
+# It is therefore a FILING check. Read a green here as "the sections agree with the rows",
+# never as "the queue is accurate".
+CURRENT_CATEGORY="docket-filing"
+section "Docket filing discipline"
+dk_file=".repo-manager/DOCKET.chloeai"
+if [ ! -f "$dk_file" ]; then
+  pass "docket-filing: no ${dk_file} here — the queue lives in the substrate repo"
+else
+  dk_found=0
+  while IFS='|' read -r dk_kind dk_id dk_extra; do
+    [ -n "${dk_kind:-}" ] || continue
+    dk_found=$((dk_found + 1))
+    case "$dk_kind" in
+      MISFILED)
+        soft_fail "docket-filing: ${dk_id} says \"BLOCKED ON\" in its body but is filed under # OPEN — move it to # BLOCKED, or reword it if it is actually actionable. A blocked list that does not list what is blocked is the surface someone asks 'what is on me' and gets a wrong answer from." ;;
+      NOBLOCKER)
+        soft_fail "docket-filing: ${dk_id} is filed under # BLOCKED but names no blocker — the header requires it (\"The blocker is NAMED in the row\"), otherwise nobody can tell what would unblock it." ;;
+      DUPID)
+        soft_fail "docket-filing: ${dk_id} appears more than once — IDs are STABLE and never reused, so a duplicate means two items answer to one citation." ;;
+      NOWHY)
+        soft_fail "docket-filing: ${dk_id} is CLOSED without a \"CLOSED YYYY-MM-DD — \" date-and-why — the header's one hard rule is that an item leaves this queue one way, with a why and a date. No silent exits." ;;
+      ORDER)
+        soft_fail "docket-filing: ${dk_id} is out of order inside # ${dk_extra} — rows run lowest-ID-first within a group, which is what makes the file scannable by eye." ;;
+    esac
+  done <<EOF
+$(awk '
+  /^# OPEN/    { sec="OPEN";    last=0; next }
+  /^# BLOCKED/ { sec="BLOCKED"; last=0; next }
+  /^# CLOSED/  { sec="CLOSED";  last=0; next }
+  /^\[D-[0-9]+\]/ {
+    id = substr($1, 2, index($1, "]") - 2)
+    n  = id + 0; sub(/^D-0*/, "", n); n = n + 0
+    num = id; sub(/^D-/, "", num); num = num + 0
+    if (seen[id]++) print "DUPID|" id "|"
+    # ONE REPORT PER SECTION. A single row inserted at the top makes every row after it
+    # compare low; the first seeded test emitted four warnings for one defect, which is the
+    # noise that gets a gate ignored. Name the break point, then stop.
+    if (sec != "" && num < last && !ordered[sec]++) print "ORDER|" id "|" sec
+    if (num > last) last = num
+    # NEGATIONS ARE NOT DECLARATIONS. "NOT BLOCKED ON HARDWARE ANY MORE" is a row saying it
+    # is free, and the first run of this check flagged exactly that (D-50). Strip the negated
+    # forms before testing, or the gate reports the opposite of the truth.
+    body = $0
+    gsub(/NOT BLOCKED ON/,        "", body)
+    gsub(/NO LONGER BLOCKED ON/,  "", body)
+    gsub(/NEVER BLOCKED ON/,      "", body)
+    gsub(/WAS BLOCKED ON/,        "", body)
+    gsub(/UNBLOCKED/,             "", body)
+    if (sec == "OPEN"    && index(body, "BLOCKED ON") > 0) print "MISFILED|" id "|"
+    if (sec == "BLOCKED" && index(body, "BLOCKED ON") == 0 && index(body, "blocked on") == 0 && index(body, "BLOCKED BY") == 0) print "NOBLOCKER|" id "|"
+    if (sec == "CLOSED"  && $0 !~ /CLOSED [0-9]{4}-[0-9]{2}-[0-9]{2} — /) print "NOWHY|" id "|"
+  }
+' "$dk_file")
+EOF
+  if [ "$dk_found" -eq 0 ]; then
+    dk_n=$(grep -cE '^\[D-[0-9]+\]' "$dk_file" 2>/dev/null || echo 0)
+    dk_b=$(awk '/^# BLOCKED/,/^# CLOSED/' "$dk_file" 2>/dev/null | grep -cE '^\[D-[0-9]+\]' || echo 0)
+    pass "docket-filing: ${dk_n} row(s), sections agree with the rows (${dk_b} filed BLOCKED, each naming a blocker), IDs unique, every CLOSED row dated"
+  fi
+fi
+
 # project repo having none is the correct state, not a gap.
 CURRENT_CATEGORY="plan-uncaptured"
 section "Plan capture"
