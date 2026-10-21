@@ -84,7 +84,9 @@ pre-push:
   # `script:` jobs are NOT skipped on either. Measured 2026-10-20 on lefthook 2.1.11
   # (CHLOE-WyliNux) and 2.1.8 (ChloeMac). That is observed behaviour, not documented
   # behaviour, so after ANY lefthook upgrade, on every host, run:
-  #   bash ~/GitHub/.claude/skills/drift-sweep/lefthook-skip-fixture.sh
+  #   bash ~/GitHub/.claude/skills/drift-sweep/lefthook-skip-fixture.sh --record
+  # `lefthook-verified` in the args below BLOCKS a push from a lefthook version
+  # that run has not passed on (D-76, armed at pre-push only on Wy's ruling).
   # Exit 1 = these arms are inert on those pushes again; until fixed, run
   # `lefthook run pre-push --force` by hand before such a push.
   # The two scripts in .lefthook/pre-push/ are identical in every fleet repo. What
@@ -104,7 +106,7 @@ pre-push:
     - name: drift-sweep-push
       script: drift-sweep-push.sh
       runner: bash
-      args: --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,waystone-freshness,wrap-continuity
+      args: --quiet --fail-on=working-tree,untracked-docs,file-journals,waystone-validity,waystone-freshness,wrap-continuity,lefthook-verified
     # Block a push that would DISCARD commits the remote already has.
     #
     # REPLACES `no-force-push-main`, which blocked nothing: its body was an echo,
